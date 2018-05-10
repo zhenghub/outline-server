@@ -36,25 +36,14 @@ export class LibevShadowsocksServer implements ShadowsocksServer {
     logging.info(`Starting server on port ${portNumber}`);
 
     const statsAddress = statsSocket.address();
-    const commandArguments = [
-      '-m', encryptionMethod,  // Encryption method
-      '-u',                    // Allow UDP
-      '--fast-open',           // Allow TCP fast open
-      '-p', portNumber.toString(), '-k', password, '--manager-address',
-      `${statsAddress.address}:${statsAddress.port}`
-    ];
-    logging.info('starting ss-server with args: ' + commandArguments.join(' '));
-    // Add the system DNS servers.
-    // TODO(fortuna): Add dns.getServers to @types/node.
-    for (const dnsServer of dns.getServers()) {
-      commandArguments.push('-d');
-      commandArguments.push(dnsServer);
-    }
-    if (this.verbose) {
-      // Make the Shadowsocks output verbose in debug mode.
-      commandArguments.push('-v');
-    }
-    const childProcess = child_process.spawn('ss-server', commandArguments);
+    const commandArguments = ['-u', `${encryptionMethod}:${password}`, '-s', `:${portNumber.toString()}`];
+    logging.info('starting ss-example with args: ' + commandArguments.join(' '));
+    // TODO(fortuna): Re-add this on the final binary
+    // if (this.verbose) {
+    //   // Make the Shadowsocks output verbose in debug mode.
+    //   commandArguments.push('-v');
+    // }
+    const childProcess = child_process.spawn('/root/shadowbox/ss-example', commandArguments);
 
     childProcess.on('error', (error) => {
       logging.error(`Error spawning server on port ${portNumber}: ${error}`);

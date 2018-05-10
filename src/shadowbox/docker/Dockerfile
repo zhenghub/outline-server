@@ -13,14 +13,17 @@
 # limitations under the License.
 
 # See versions at https://hub.docker.com/_/node/
-FROM node:8.10.0-alpine
+FROM golang:1-alpine as ss-example
 
-# Versions can be found at https://github.com/shadowsocks/shadowsocks-libev/releases
-ARG SS_VERSION=3.1.3
+RUN apk add --no-cache git
+RUN git clone -b ss-lib https://github.com/fortuna/go-shadowsocks2.git $(go env GOPATH)/src/github.com/shadowsocks/go-shadowsocks2
+RUN git clone https://github.com/fortuna/ss-example.git $(go env GOPATH)/src/github.com/fortuna/ss-example
+RUN go get github.com/fortuna/ss-example
+
+FROM node:8.10.0-alpine
 
 # Save metadata on the software versions we are using.
 LABEL shadowbox.node_version=8.10.0
-LABEL shadowbox.shadowsocks_version="${SS_VERSION}"
 
 ARG GITHUB_RELEASE
 LABEL shadowbox.github.release="${GITHUB_RELEASE}"
@@ -28,10 +31,9 @@ LABEL shadowbox.github.release="${GITHUB_RELEASE}"
 # lsof for Shadowbox, curl for detecting our public IP.
 RUN apk add --no-cache lsof curl
 
-COPY src/shadowbox/scripts scripts/
-RUN sh ./scripts/install_shadowsocks.sh $SS_VERSION
-
 WORKDIR /root/shadowbox
+
+COPY --from=ss-example /go/bin/ss-example .
 
 # Install management service
 COPY build/shadowbox/app app/
