@@ -393,9 +393,10 @@ install_shadowbox() {
   # TODO(fortuna): Make sure this is IPv4
   readonly SB_PUBLIC_IP=${SB_PUBLIC_IP:-$(curl -4s https://ipinfo.io/ip)}
 
-  if [[ ! "$SB_PUBLIC_IP" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-    log_error "Invalid IP lookup result: $SB_PUBLIC_IP"
-    log_for_sentry "Invalid IP lookup result"
+  if [[ -z $SB_PUBLIC_IP ]]; then
+    local readonly MSG="Failed to determine the server's IP address."
+    log_error "$MSG"
+    log_for_sentry "$MSG"
     exit 1
   fi
 
@@ -441,13 +442,10 @@ install_shadowbox() {
 
 CONGRATULATIONS! Your Outline server is up and running.
 
-To manage your Outline server, please copy the following text (including curly
+To manage your Outline server, please copy the following line (including curly
 brackets) into Step 2 of the Outline Manager interface:
 
-{
-  "apiUrl": "$(get_field_value apiUrl)",
-  "certSha256": "$(get_field_value certSha256)"
-}
+$(echo -e "\033[1;32m{\"apiUrl\":\"$(get_field_value apiUrl)\",\"certSha256\":\"$(get_field_value certSha256)\"}\033[0m")
 
 ${FIREWALL_STATUS}
 END_OF_SERVER_OUTPUT
