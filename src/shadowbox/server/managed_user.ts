@@ -17,12 +17,12 @@ import * as dgram from 'dgram';
 import * as randomstring from 'randomstring';
 import * as uuidv4 from 'uuid/v4';
 
-import { getRandomUnusedPort, getRandomPortOver1023 } from '../infrastructure/get_port';
+import {getRandomPortOver1023, getRandomUnusedPort} from '../infrastructure/get_port';
 import * as logging from '../infrastructure/logging';
-import { AccessKey, AccessKeyId, AccessKeyRepository } from '../model/access_key';
-import { Stats } from '../model/metrics';
-import { ShadowsocksInstance, ShadowsocksServer } from '../model/shadowsocks_server';
-import { TextFile } from '../model/text_file';
+import {AccessKey, AccessKeyId, AccessKeyRepository} from '../model/access_key';
+import {Stats} from '../model/metrics';
+import {ShadowsocksInstance, ShadowsocksServer} from '../model/shadowsocks_server';
+import {TextFile} from '../model/text_file';
 
 // The format as json of access keys in the config file.
 interface AccessKeyConfig {
@@ -45,7 +45,9 @@ interface ConfigJson {
 
 // AccessKey implementation that starts and stops a Shadowsocks server.
 class ManagedAccessKey implements AccessKey {
-  constructor(public id: AccessKeyId, public metricsId: AccessKeyId, public name: string, public shadowsocksInstance: ShadowsocksInstance) { }
+  constructor(
+      public id: AccessKeyId, public metricsId: AccessKeyId, public name: string,
+      public shadowsocksInstance: ShadowsocksInstance) {}
 
   public rename(name: string): void {
     this.name = name;
@@ -58,7 +60,7 @@ function generatePassword(): string {
 }
 
 function readConfig(configFile: TextFile): ConfigJson {
-  const EMPTY_CONFIG = { accessKeys: [], nextId: 0 } as ConfigJson;
+  const EMPTY_CONFIG = {accessKeys: [], nextId: 0} as ConfigJson;
 
   // Try to read the file from disk.
   let configText: string;
@@ -81,9 +83,8 @@ function readConfig(configFile: TextFile): ConfigJson {
 }
 
 export function createManagedAccessKeyRepository(
-  configFile: TextFile,
-  shadowsocksServer: ShadowsocksServer,
-  stats: Stats): Promise<AccessKeyRepository> {
+    configFile: TextFile, shadowsocksServer: ShadowsocksServer,
+    stats: Stats): Promise<AccessKeyRepository> {
   const repo = new ManagedAccessKeyRepository(configFile, shadowsocksServer, stats);
   return repo.init().then(() => {
     return repo;
@@ -102,9 +103,8 @@ class ManagedAccessKeyRepository implements AccessKeyRepository {
   private reservedPorts: Set<number> = new Set();
 
   constructor(
-    private configFile: TextFile, private shadowsocksServer: ShadowsocksServer,
-    private stats: Stats) {
-  }
+      private configFile: TextFile, private shadowsocksServer: ShadowsocksServer,
+      private stats: Stats) {}
 
   // Initialize the repository from the config file.
   public init(): Promise<void> {

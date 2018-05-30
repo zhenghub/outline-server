@@ -16,11 +16,10 @@ import * as child_process from 'child_process';
 import * as dgram from 'dgram';
 import * as dns from 'dns';
 import * as events from 'events';
-
-import { SIP002_URI, makeConfig } from 'ShadowsocksConfig/shadowsocks_config';
+import {makeConfig, SIP002_URI} from 'ShadowsocksConfig/shadowsocks_config';
 
 import * as logging from '../infrastructure/logging';
-import { ShadowsocksInstance, ShadowsocksServer } from '../model/shadowsocks_server';
+import {ShadowsocksInstance, ShadowsocksServer} from '../model/shadowsocks_server';
 
 // Runs shadowsocks-libev server instances.
 export class LibevShadowsocksServer implements ShadowsocksServer {
@@ -31,7 +30,7 @@ export class LibevShadowsocksServer implements ShadowsocksServer {
   private portProcesses = new Map<number, child_process.ChildProcess>();
   private portKeys = new Map<number, Set<string>>();
 
-  constructor(private publicAddress: string, private verbose: boolean) { }
+  constructor(private publicAddress: string, private verbose: boolean) {}
 
   private startPort(portNumber: number, keys: Set<string>) {
     let portProcess = this.portProcesses.get(portNumber);
@@ -72,8 +71,8 @@ export class LibevShadowsocksServer implements ShadowsocksServer {
   }
 
   public startInstance(
-    portNumber: number, password: string, statsSocket: dgram.Socket,
-    encryptionMethod = this.DEFAULT_METHOD): Promise<ShadowsocksInstance> {
+      portNumber: number, password: string, statsSocket: dgram.Socket,
+      encryptionMethod = this.DEFAULT_METHOD): Promise<ShadowsocksInstance> {
     logging.info(`Starting server on port ${portNumber}`);
 
     const statsAddress = statsSocket.address();
@@ -98,7 +97,7 @@ export class LibevShadowsocksServer implements ShadowsocksServer {
       this.stopInstance(portNumber, key);
     };
     return Promise.resolve(new PortShadowsocksServerInstance(
-      stopFn, portNumber, password, encryptionMethod, accessUrl, statsSocket));
+        stopFn, portNumber, password, encryptionMethod, accessUrl, statsSocket));
   }
 
   public stopInstance(portNumber: number, key: string) {
@@ -113,9 +112,9 @@ class PortShadowsocksServerInstance implements ShadowsocksInstance {
   private INBOUND_BYTES_EVENT = 'inboundBytes';
 
   constructor(
-    private stopFn: Function,
-    public portNumber: number, public password, public encryptionMethod: string,
-    public accessUrl: string, private statsSocket: dgram.Socket) { }
+      private stopFn: Function, public portNumber: number, public password,
+      public encryptionMethod: string, public accessUrl: string,
+      private statsSocket: dgram.Socket) {}
 
   public stop() {
     logging.info(`Stopping server on port ${this.portNumber}`);
@@ -199,8 +198,8 @@ interface StatsMessage {
 
 function parseStatsMessage(buf): StatsMessage {
   const jsonString = buf.toString()
-    .substr('stat: '.length)  // remove leading "stat: "
-    .replace(/\0/g, '');      // remove trailing null terminator
+                         .substr('stat: '.length)  // remove leading "stat: "
+                         .replace(/\0/g, '');      // remove trailing null terminator
   // statObj is in the form {"port#": totalBytesTransferred}, where
   // there is always only 1 port# per JSON object. If there are multiple
   // ss-servers communicating to the same manager, we will get multiple
