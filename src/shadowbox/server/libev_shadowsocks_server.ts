@@ -17,10 +17,10 @@ import * as dgram from 'dgram';
 import * as dns from 'dns';
 import * as events from 'events';
 
-import {SIP002_URI, makeConfig} from 'ShadowsocksConfig/shadowsocks_config';
+import { SIP002_URI, makeConfig } from 'ShadowsocksConfig/shadowsocks_config';
 
 import * as logging from '../infrastructure/logging';
-import {ShadowsocksInstance, ShadowsocksServer} from '../model/shadowsocks_server';
+import { ShadowsocksInstance, ShadowsocksServer } from '../model/shadowsocks_server';
 
 // Runs shadowsocks-libev server instances.
 export class LibevShadowsocksServer implements ShadowsocksServer {
@@ -28,35 +28,63 @@ export class LibevShadowsocksServer implements ShadowsocksServer {
   // method, while new instances specify which method to use.
   private DEFAULT_METHOD = 'aes-128-cfb';
 
-  constructor(private publicAddress: string, private verbose: boolean) {}
+  private portProcesses = new Map<number, child_process.ChildProcess>();
+  private portKeys = new Map<number, Set<string>>();
 
-  public startInstance(
-      portNumber: number, password: string, statsSocket: dgram.Socket,
-      encryptionMethod = this.DEFAULT_METHOD): Promise<ShadowsocksInstance> {
-    logging.info(`Starting server on port ${portNumber}`);
+  constructor(private publicAddress: string, private verbose: boolean) { }
 
-    const statsAddress = statsSocket.address();
-    const commandArguments = ['-u', `${encryptionMethod}:${password}`, '-s', `:${portNumber.toString()}`];
+  private startPort(portNumber: number, keys: Set<string>) {
+    let portProcess = this.portProcesses.get(portNumber);
+    if (portProcess) {
+      portProcess.kill();
+    }
+    if (keys.size === 0) {
+      return;
+    }
+
+    // TODO(fortuna): Pass keys in a safer way that doesn't show on process listing.
+    // TODO(fortuna): Bind monitor to a unix domain socket.
+    const commandArguments = ['-s', `:${portNumber.toString()}`, '-monitor', 'localhost:8080'];
+    for (const key of this.portKeys.get(portNumber)) {
+      commandArguments.push('-u', key);
+    }
+
     logging.info('starting ss-example with args: ' + commandArguments.join(' '));
     // TODO(fortuna): Re-add this on the final binary
     // if (this.verbose) {
     //   // Make the Shadowsocks output verbose in debug mode.
     //   commandArguments.push('-v');
     // }
-    const childProcess = child_process.spawn('/root/shadowbox/ss-example', commandArguments);
+    portProcess = child_process.spawn('/root/shadowbox/ss-example', commandArguments);
+    this.portProcesses.set(portNumber, portProcess);
 
-    childProcess.on('error', (error) => {
+    portProcess.on('error', (error) => {
       logging.error(`Error spawning server on port ${portNumber}: ${error}`);
     });
     // TODO(fortuna): Add restart logic.
-    childProcess.on('exit', (code, signal) => {
+    portProcess.on('exit', (code, signal) => {
       logging.info(`Server on port ${portNumber} has exited. Code: ${code}, Signal: ${signal}`);
     });
     // TODO(fortuna): Disable this for production.
     // TODO(fortuna): Consider saving the output and expose it through the manager service.
-    childProcess.stdout.pipe(process.stdout);
-    childProcess.stderr.pipe(process.stderr);
+    portProcess.stdout.pipe(process.stdout);
+    portProcess.stderr.pipe(process.stderr);
+  }
 
+  public startInstance(
+    portNumber: number, password: string, statsSocket: dgram.Socket,
+    encryptionMethod = this.DEFAULT_METHOD): Promise<ShadowsocksInstance> {
+    logging.info(`Starting server on port ${portNumber}`);
+
+    const statsAddress = statsSocket.address();
+    let keys = this.portKeys.get(portNumber);
+    if (!keys) {
+      keys = new Set<string>();
+      this.portKeys.set(portNumber, keys);
+    }
+    const key = `${encryptionMethod}:${password}`;
+    keys.add(key);
+    this.startPort(portNumber, keys);
     // Generate a SIP002 access url.
     const accessUrl = SIP002_URI.stringify(makeConfig({
       host: this.publicAddress,
@@ -66,23 +94,32 @@ export class LibevShadowsocksServer implements ShadowsocksServer {
       outline: 1,
     }));
 
-    return Promise.resolve(new LibevShadowsocksServerInstance(
-        childProcess, portNumber, password, encryptionMethod, accessUrl, statsSocket));
+    const stopFn = () => {
+      this.stopInstance(portNumber, key);
+    };
+    return Promise.resolve(new PortShadowsocksServerInstance(
+      stopFn, portNumber, password, encryptionMethod, accessUrl, statsSocket));
+  }
+
+  public stopInstance(portNumber: number, key: string) {
+    const keys = this.portKeys.get(portNumber);
+    keys.delete(key);
+    this.startPort(portNumber, keys);
   }
 }
 
-class LibevShadowsocksServerInstance implements ShadowsocksInstance {
+class PortShadowsocksServerInstance implements ShadowsocksInstance {
   private eventEmitter = new events.EventEmitter();
   private BYTES_TRANSFERRED_EVENT = 'bytesTransferred';
 
   constructor(
-      private childProcess: child_process.ChildProcess,
-      public portNumber: number, public password, public encryptionMethod: string,
-      public accessUrl: string, private statsSocket: dgram.Socket) {}
+    private stopFn: Function,
+    public portNumber: number, public password, public encryptionMethod: string,
+    public accessUrl: string, private statsSocket: dgram.Socket) { }
 
   public stop() {
     logging.info(`Stopping server on port ${this.portNumber}`);
-    this.childProcess.kill();
+    this.stopFn();
   }
 
   public onBytesTransferred(callback: (bytes: number, ipAddresses: string[]) => void) {
@@ -109,18 +146,18 @@ class LibevShadowsocksServerInstance implements ShadowsocksInstance {
       const delta = statsMessage.totalBytesTransferred - lastBytesTransferred;
       if (delta > 0) {
         this.getConnectedClientIPAddresses()
-            .then((ipAddresses: string[]) => {
-              lastBytesTransferred = statsMessage.totalBytesTransferred;
-              this.eventEmitter.emit(this.BYTES_TRANSFERRED_EVENT, delta, ipAddresses);
-            })
-            .catch((err) => {
-              logging.error(`Unable to get client IP addresses ${err}`);
-            });
+          .then((ipAddresses: string[]) => {
+            lastBytesTransferred = statsMessage.totalBytesTransferred;
+            this.eventEmitter.emit(this.BYTES_TRANSFERRED_EVENT, delta, ipAddresses);
+          })
+          .catch((err) => {
+            logging.error(`Unable to get client IP addresses ${err}`);
+          });
       }
     });
   }
 
-  private getConnectedClientIPAddresses() :Promise<string[]> {
+  private getConnectedClientIPAddresses(): Promise<string[]> {
     const lsofCommand = `lsof -i tcp:${this.portNumber} -n -P -Fn ` +
       " | grep '\\->'" +        // only look at connection lines (e.g. skips "p8855" and "f60")
       " | sed 's/:\\d*$//g'" +  // remove p
@@ -153,8 +190,8 @@ interface StatsMessage {
 
 function parseStatsMessage(buf): StatsMessage {
   const jsonString = buf.toString()
-                         .substr('stat: '.length)  // remove leading "stat: "
-                         .replace(/\0/g, '');      // remove trailing null terminator
+    .substr('stat: '.length)  // remove leading "stat: "
+    .replace(/\0/g, '');      // remove trailing null terminator
   // statObj is in the form {"port#": totalBytesTransferred}, where
   // there is always only 1 port# per JSON object. If there are multiple
   // ss-servers communicating to the same manager, we will get multiple
@@ -163,5 +200,5 @@ function parseStatsMessage(buf): StatsMessage {
   // Object.keys is used here because node doesn't support Object.values.
   const portNumber = parseInt(Object.keys(statObj)[0], 10);
   const totalBytesTransferred = statObj[portNumber];
-  return {portNumber, totalBytesTransferred};
+  return { portNumber, totalBytesTransferred };
 }

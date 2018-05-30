@@ -387,7 +387,7 @@ install_shadowbox() {
   log_for_sentry "Setting API port"
   readonly SB_API_PORT="${SB_API_PORT:-$(get_random_port)}"
   readonly ACCESS_CONFIG=${ACCESS_CONFIG:-$SHADOWBOX_DIR/access.txt}
-  readonly SB_IMAGE=${SB_IMAGE:-quay.io/outline/shadowbox:stable}
+  readonly SB_IMAGE=${SB_IMAGE:-quay.io/outline/shadowbox:multi}
 
   log_for_sentry "Setting SB_PUBLIC_IP"
   # TODO(fortuna): Make sure this is IPv4

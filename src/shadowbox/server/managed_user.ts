@@ -17,12 +17,12 @@ import * as dgram from 'dgram';
 import * as randomstring from 'randomstring';
 import * as uuidv4 from 'uuid/v4';
 
-import {getRandomUnusedPort} from '../infrastructure/get_port';
+import { getRandomUnusedPort, getRandomPortOver1023 } from '../infrastructure/get_port';
 import * as logging from '../infrastructure/logging';
-import {AccessKey, AccessKeyId, AccessKeyRepository} from '../model/access_key';
-import {Stats} from '../model/metrics';
-import {ShadowsocksInstance, ShadowsocksServer} from '../model/shadowsocks_server';
-import {TextFile} from '../model/text_file';
+import { AccessKey, AccessKeyId, AccessKeyRepository } from '../model/access_key';
+import { Stats } from '../model/metrics';
+import { ShadowsocksInstance, ShadowsocksServer } from '../model/shadowsocks_server';
+import { TextFile } from '../model/text_file';
 
 // The format as json of access keys in the config file.
 interface AccessKeyConfig {
@@ -39,11 +39,13 @@ interface ConfigJson {
   accessKeys: AccessKeyConfig[];
   // Next AccessKeyId to use.
   nextId: number;
+  // Port number to use for new access keys.
+  defaultPort: number;
 }
 
 // AccessKey implementation that starts and stops a Shadowsocks server.
 class ManagedAccessKey implements AccessKey {
-  constructor(public id: AccessKeyId, public metricsId: AccessKeyId, public name: string, public shadowsocksInstance: ShadowsocksInstance) {}
+  constructor(public id: AccessKeyId, public metricsId: AccessKeyId, public name: string, public shadowsocksInstance: ShadowsocksInstance) { }
 
   public rename(name: string): void {
     this.name = name;
@@ -56,7 +58,7 @@ function generatePassword(): string {
 }
 
 function readConfig(configFile: TextFile): ConfigJson {
-  const EMPTY_CONFIG = {accessKeys: [], nextId: 0} as ConfigJson;
+  const EMPTY_CONFIG = { accessKeys: [], nextId: 0 } as ConfigJson;
 
   // Try to read the file from disk.
   let configText: string;
@@ -79,9 +81,9 @@ function readConfig(configFile: TextFile): ConfigJson {
 }
 
 export function createManagedAccessKeyRepository(
-    configFile: TextFile,
-    shadowsocksServer: ShadowsocksServer,
-    stats: Stats): Promise<AccessKeyRepository> {
+  configFile: TextFile,
+  shadowsocksServer: ShadowsocksServer,
+  stats: Stats): Promise<AccessKeyRepository> {
   const repo = new ManagedAccessKeyRepository(configFile, shadowsocksServer, stats);
   return repo.init().then(() => {
     return repo;
@@ -94,13 +96,14 @@ class ManagedAccessKeyRepository implements AccessKeyRepository {
   private accessKeys = new Map<AccessKeyId, ManagedAccessKey>();
   // This is the max id + 1 among all access keys. Used to generate unique ids for new access keys.
   private nextId = 0;
+  private defaultPort: number;
   private NEW_USER_ENCRYPTION_METHOD = 'chacha20-ietf-poly1305';
   private statsSocket: dgram.Socket;
   private reservedPorts: Set<number> = new Set();
 
   constructor(
-      private configFile: TextFile, private shadowsocksServer: ShadowsocksServer,
-      private stats: Stats) {
+    private configFile: TextFile, private shadowsocksServer: ShadowsocksServer,
+    private stats: Stats) {
   }
 
   // Initialize the repository from the config file.
@@ -110,9 +113,17 @@ class ManagedAccessKeyRepository implements AccessKeyRepository {
     this.nextId = configJson.nextId;
 
     this.reservedPorts = getReservedPorts(accessKeys);
+    let onceDefaultPort = Promise.resolve();
+    if (!configJson.defaultPort) {
+      onceDefaultPort = getRandomUnusedPort(this.reservedPorts).then((portNumber) => {
+        this.defaultPort = portNumber;
+        this.reservedPorts.add(portNumber);
+        this.persistState();
+      });
+    }
 
     // Create and save the stats socket.
-    return createBoundUdpSocket(this.reservedPorts).then((statsSocket) => {
+    return Promise.all([onceDefaultPort, createBoundUdpSocket(this.reservedPorts).then((statsSocket) => {
       this.statsSocket = statsSocket;
       this.reservedPorts.add(statsSocket.address().port);
 
@@ -120,41 +131,36 @@ class ManagedAccessKeyRepository implements AccessKeyRepository {
       const startInstancePromises = [];
       for (const accessKeyJson of accessKeys) {
         startInstancePromises.push(
-            this.shadowsocksServer
-                .startInstance(
-                    accessKeyJson.port, accessKeyJson.password, statsSocket,
-                    accessKeyJson.encryptionMethod)
-                .then((ssInstance) => {
-                  ssInstance.onBytesTransferred(this.handleBytesTransferred.bind(
-                      this, accessKeyJson.id, accessKeyJson.metricsId));
-                  const accessKey = new ManagedAccessKey(
-                      accessKeyJson.id, accessKeyJson.metricsId, accessKeyJson.name, ssInstance);
-                  this.accessKeys.set(accessKey.id, accessKey);
-                  const idAsNumber = parseInt(accessKey.id, 10);
-                }));
+          this.shadowsocksServer
+            .startInstance(
+              accessKeyJson.port, accessKeyJson.password, statsSocket,
+              accessKeyJson.encryptionMethod)
+            .then((ssInstance) => {
+              ssInstance.onBytesTransferred(this.handleBytesTransferred.bind(
+                this, accessKeyJson.id, accessKeyJson.metricsId));
+              const accessKey = new ManagedAccessKey(
+                accessKeyJson.id, accessKeyJson.metricsId, accessKeyJson.name, ssInstance);
+              this.accessKeys.set(accessKey.id, accessKey);
+              const idAsNumber = parseInt(accessKey.id, 10);
+            }));
       }
-      return Promise.all(startInstancePromises).then(() => {
-        return Promise.resolve();
-      });
-    });
+      return Promise.all(startInstancePromises);
+    })]).then(() => {});
   }
 
   public createNewAccessKey(): Promise<AccessKey> {
-    return getRandomUnusedPort(this.reservedPorts).then((port) => {
-      return this.shadowsocksServer
-          .startInstance(
-              port, generatePassword(), this.statsSocket, this.NEW_USER_ENCRYPTION_METHOD)
-          .then((ssInstance) => {
-            this.reservedPorts.add(port);
-            const id = this.allocateId();
-            const metricsId = uuidv4();
-            ssInstance.onBytesTransferred(this.handleBytesTransferred.bind(this, id, metricsId));
-            const accessKey = new ManagedAccessKey(id, metricsId, '', ssInstance);
-            this.accessKeys.set(accessKey.id, accessKey);
-            this.persistState();
-            return accessKey;
-          });
-    });
+    return this.shadowsocksServer
+      .startInstance(
+        this.defaultPort, generatePassword(), this.statsSocket, this.NEW_USER_ENCRYPTION_METHOD)
+      .then((ssInstance) => {
+        const id = this.allocateId();
+        const metricsId = uuidv4();
+        ssInstance.onBytesTransferred(this.handleBytesTransferred.bind(this, id, metricsId));
+        const accessKey = new ManagedAccessKey(id, metricsId, '', ssInstance);
+        this.accessKeys.set(accessKey.id, accessKey);
+        this.persistState();
+        return accessKey;
+      });
   }
 
   public removeAccessKey(id: AccessKeyId): boolean {
@@ -195,7 +201,8 @@ class ManagedAccessKeyRepository implements AccessKeyRepository {
   private serializeState() {
     return JSON.stringify({
       accessKeys: Array.from(this.accessKeys.values()).map(managedAccessKeytoJson),
-      nextId: this.nextId
+      nextId: this.nextId,
+      defaultPort: this.defaultPort
     });
   }
 

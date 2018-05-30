@@ -57,7 +57,7 @@ function ss_arguments_for_user() {
 
 # Runs curl on the client container.
 function client_curl() {
-  docker exec $CLIENT_CONTAINER curl "$@"
+  docker exec $CLIENT_CONTAINER curl --silent --show-error "$@"
 }
 
 # Start a subprocess for trap
