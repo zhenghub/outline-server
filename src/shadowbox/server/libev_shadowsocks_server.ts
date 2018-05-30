@@ -110,7 +110,7 @@ export class LibevShadowsocksServer implements ShadowsocksServer {
 
 class PortShadowsocksServerInstance implements ShadowsocksInstance {
   private eventEmitter = new events.EventEmitter();
-  private BYTES_TRANSFERRED_EVENT = 'bytesTransferred';
+  private INBOUND_BYTES_EVENT = 'inboundBytes';
 
   constructor(
     private stopFn: Function,
@@ -122,15 +122,24 @@ class PortShadowsocksServerInstance implements ShadowsocksInstance {
     this.stopFn();
   }
 
-  public onBytesTransferred(callback: (bytes: number, ipAddresses: string[]) => void) {
-    if (this.eventEmitter.listenerCount(this.BYTES_TRANSFERRED_EVENT) === 0) {
+  // onInboundBytes only reports inbound bytes, received from the client or from the target.
+  //
+  // This measure under-estimates outbound traffic because:
+  // 1) The traffic to and from the client has overhead from Shadowsocks
+  // 2) The overhead on the traffic to the client is larger than on the traffic from the client
+  //    because, from the client perspective, download traffic is usually larger than upload.
+  //
+  // The measure is calculated here:
+  // https://github.com/shadowsocks/shadowsocks-libev/blob/a16826b83e73af386806d1b51149f8321820835e/src/server.c#L172
+  public onInboundBytes(callback: (bytes: number, ipAddresses: string[]) => void) {
+    if (this.eventEmitter.listenerCount(this.INBOUND_BYTES_EVENT) === 0) {
       this.createStatsListener();
     }
-    this.eventEmitter.on(this.BYTES_TRANSFERRED_EVENT, callback);
+    this.eventEmitter.on(this.INBOUND_BYTES_EVENT, callback);
   }
 
   private createStatsListener() {
-    let lastBytesTransferred = 0;
+    let lastInboundBytes = 0;
     this.statsSocket.on('message', (buf: Buffer) => {
       let statsMessage;
       try {
@@ -143,12 +152,12 @@ class PortShadowsocksServerInstance implements ShadowsocksInstance {
         // Ignore stats for other ss-servers, which post to the same statsSocket.
         return;
       }
-      const delta = statsMessage.totalBytesTransferred - lastBytesTransferred;
+      const delta = statsMessage.totalInboundBytes - lastInboundBytes;
       if (delta > 0) {
         this.getConnectedClientIPAddresses()
           .then((ipAddresses: string[]) => {
-            lastBytesTransferred = statsMessage.totalBytesTransferred;
-            this.eventEmitter.emit(this.BYTES_TRANSFERRED_EVENT, delta, ipAddresses);
+            lastInboundBytes = statsMessage.totalBytesTransferred;
+            this.eventEmitter.emit(this.INBOUND_BYTES_EVENT, delta, ipAddresses);
           })
           .catch((err) => {
             logging.error(`Unable to get client IP addresses ${err}`);
@@ -185,7 +194,7 @@ class PortShadowsocksServerInstance implements ShadowsocksInstance {
 
 interface StatsMessage {
   portNumber: number;
-  totalBytesTransferred: number;
+  totalInboundBytes: number;
 }
 
 function parseStatsMessage(buf): StatsMessage {
@@ -199,6 +208,6 @@ function parseStatsMessage(buf): StatsMessage {
   const statObj = JSON.parse(jsonString);
   // Object.keys is used here because node doesn't support Object.values.
   const portNumber = parseInt(Object.keys(statObj)[0], 10);
-  const totalBytesTransferred = statObj[portNumber];
-  return { portNumber, totalBytesTransferred };
+  const totalInboundBytes = statObj[portNumber];
+  return { portNumber, totalInboundBytes };
 }
