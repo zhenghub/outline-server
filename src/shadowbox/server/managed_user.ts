@@ -113,8 +113,9 @@ class ManagedAccessKeyRepository implements AccessKeyRepository {
     this.nextId = configJson.nextId;
 
     this.reservedPorts = getReservedPorts(accessKeys);
+    this.defaultPort = configJson.defaultPort;
     let onceDefaultPort = Promise.resolve();
-    if (!configJson.defaultPort) {
+    if (!this.defaultPort) {
       onceDefaultPort = getRandomUnusedPort(this.reservedPorts).then((portNumber) => {
         this.defaultPort = portNumber;
         this.reservedPorts.add(portNumber);
@@ -123,7 +124,10 @@ class ManagedAccessKeyRepository implements AccessKeyRepository {
     }
 
     // Create and save the stats socket.
-    return Promise.all([onceDefaultPort, createBoundUdpSocket(this.reservedPorts).then((statsSocket) => {
+    return onceDefaultPort.then(() => {
+      logging.debug(`Default port is: ${this.defaultPort}`);
+      return createBoundUdpSocket(this.reservedPorts);
+    }).then((statsSocket) => {
       this.statsSocket = statsSocket;
       this.reservedPorts.add(statsSocket.address().port);
 
@@ -145,7 +149,7 @@ class ManagedAccessKeyRepository implements AccessKeyRepository {
             }));
       }
       return Promise.all(startInstancePromises);
-    })]).then(() => {});
+    }).then(() => {});
   }
 
   public createNewAccessKey(): Promise<AccessKey> {
