@@ -40,13 +40,13 @@ export class LibevShadowsocksServer implements ShadowsocksServer {
     if (keys.size === 0) {
       return;
     }
-
     // TODO(fortuna): Pass keys in a safer way that doesn't show on process listing.
     // TODO(fortuna): Bind monitor to a unix domain socket.
-    const commandArguments = ['-s', `:${portNumber.toString()}`, '-monitor', 'localhost:8080'];
+    const commandArguments = ['-s', `:${portNumber.toString()}`, '-metrics', 'localhost:8080'];
     for (const key of this.portKeys.get(portNumber)) {
       commandArguments.push('-u', key);
     }
+
 
     logging.info('starting ss-example with args: ' + commandArguments.join(' '));
     // TODO(fortuna): Re-add this on the final binary
