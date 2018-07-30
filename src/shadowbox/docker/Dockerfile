@@ -20,16 +20,19 @@ RUN git clone -b ss-lib https://github.com/fortuna/go-shadowsocks2.git $(go env 
 RUN git clone https://github.com/fortuna/ss-example.git $(go env GOPATH)/src/github.com/fortuna/ss-example
 RUN go get github.com/fortuna/ss-example
 
-FROM node:8.10.0-alpine
+FROM node:8.11.3-alpine
 
 # Save metadata on the software versions we are using.
-LABEL shadowbox.node_version=8.10.0
+LABEL shadowbox.node_version=8.11.3
 
 ARG GITHUB_RELEASE
 LABEL shadowbox.github.release="${GITHUB_RELEASE}"
 
 # lsof for Shadowbox, curl for detecting our public IP.
 RUN apk add --no-cache lsof curl
+
+COPY src/shadowbox/scripts/update_mmdb.sh /etc/periodic/weekly/update_mmdb
+RUN /etc/periodic/weekly/update_mmdb
 
 WORKDIR /root/shadowbox
 

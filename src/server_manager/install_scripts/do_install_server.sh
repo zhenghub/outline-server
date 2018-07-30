@@ -26,6 +26,10 @@
 
 set -euxo pipefail
 
+# Re-enable password login, since DigitalOcean disables it when we create a server
+# with a SSH key.
+sed -i 's/PasswordAuthentication no/# PasswordAuthentication no  # Commented out by the Outline installer/' /etc/ssh/sshd_config
+
 export SHADOWBOX_DIR="${SHADOWBOX_DIR:-${HOME:-/root}/shadowbox}"
 mkdir -p $SHADOWBOX_DIR
 
@@ -170,3 +174,10 @@ done
 # Wait for install script to finish, so that if there is any error in install_server.sh,
 # the finish trap in this file will be able to access its error code.
 wait $install_pid
+
+# Install the DigitalOcean Agent, for improved monitoring:
+# https://www.digitalocean.com/docs/monitoring/quickstart/#enable-the-digitalocean-agent-on-existing-droplets
+# 
+# Since the server manager looks only for the tags created in the previous
+# step, this does not slow down server creation.
+curl -sSL https://agent.digitalocean.com/install.sh | sh
