@@ -25,7 +25,7 @@ import {createManagedAccessKeyRepository} from './managed_access_key';
 import {bindService, ShadowsocksManagerService} from './manager_service';
 import * as metrics from './metrics';
 import * as server_config from './server_config';
-import {OutlineShadowsocksServer, ShadowsocksServer} from './shadowsocks_server';
+import {OutlineShadowsocksServer} from './shadowsocks_server';
 
 const DEFAULT_STATE_DIR = '/root/shadowbox/persisted-state';
 
