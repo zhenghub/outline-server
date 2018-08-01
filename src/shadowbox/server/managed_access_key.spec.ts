@@ -12,9 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import { createManagedAccessKeyRepository } from './managed_user';
-import { MockShadowsocksServer, MockStats, InMemoryFile } from './mocks/mocks';
+import { createManagedAccessKeyRepository } from './managed_access_key';
+import { MockStats, InMemoryFile } from './mocks/mocks';
 import { AccessKeyRepository } from '../model/access_key';
+import { AccessKey } from './shadowsocks_server';
 
 describe('ManagedAccessKeyRepository', () => {
   it('Repos with non-existent files are created with no access keys', (done) => {
@@ -141,7 +142,12 @@ function countAccessKeys(repo: AccessKeyRepository) {
 
 function createRepo(inMemoryFile: InMemoryFile) {
   return createManagedAccessKeyRepository(
-      inMemoryFile,
-      new MockShadowsocksServer(),
-      new MockStats());
+    "hostname",
+    inMemoryFile,
+    {
+      update(keys: AccessKey[]) {
+        return Promise.resolve();
+      }
+    },
+    new MockStats());
 }

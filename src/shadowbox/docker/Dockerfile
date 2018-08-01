@@ -16,9 +16,8 @@
 FROM golang:1-alpine as ss-example
 
 RUN apk add --no-cache git
-RUN git clone -b ss-lib https://github.com/fortuna/go-shadowsocks2.git $(go env GOPATH)/src/github.com/shadowsocks/go-shadowsocks2
-RUN git clone https://github.com/fortuna/ss-example.git $(go env GOPATH)/src/github.com/fortuna/ss-example
-RUN go get github.com/fortuna/ss-example
+RUN git clone -b ss-lib https://github.com/fortuna/go-shadowsocks2.git /go/src/github.com/shadowsocks/go-shadowsocks2
+RUN go get github.com/Jigsaw-Code/outline-ss-server
 
 FROM node:8.11.3-alpine
 
@@ -36,7 +35,7 @@ RUN /etc/periodic/weekly/update_mmdb
 
 WORKDIR /root/shadowbox
 
-COPY --from=ss-example /go/bin/ss-example .
+COPY --from=ss-example /go/bin/outline-ss-server .
 
 # Install management service
 COPY build/shadowbox/app app/

@@ -154,7 +154,7 @@ function getFirstAccessKey(repo: AccessKeyRepository) {
 function createNewAccessKeyWithName(
     repo: AccessKeyRepository, name: string): Promise<AccessKey> {
   return repo.createNewAccessKey().then((key) => {
-    key.rename(name);
+    key.name = name;
     return key;
   });
 }

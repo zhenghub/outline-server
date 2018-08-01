@@ -21,8 +21,8 @@ import {FilesystemTextFile} from '../infrastructure/filesystem_text_file';
 import * as ip_location from '../infrastructure/ip_location';
 import * as logging from '../infrastructure/logging';
 
-import {LibevShadowsocksServer} from './libev_shadowsocks_server';
-import {createManagedAccessKeyRepository} from './managed_user';
+import {OutlineShadowsocksServer, ShadowsocksServer} from './shadowsocks_server';
+import {createManagedAccessKeyRepository} from './managed_access_key';
 import {ShadowsocksManagerService} from './manager_service';
 import * as metrics from './metrics';
 import * as server_config from './server_config';
@@ -31,7 +31,7 @@ const DEFAULT_STATE_DIR = '/root/shadowbox/persisted-state';
 
 function main() {
   const verbose = process.env.LOG_LEVEL === 'debug';
-  const publicAddress = process.env.SB_PUBLIC_IP;
+  const proxyHostname = process.env.SB_PUBLIC_IP;
   // Default to production metrics, as some old Docker images may not have
   // SB_METRICS_URL properly set.
   const metricsUrl = process.env.SB_METRICS_URL || 'https://metrics-prod.uproxy.org';
@@ -39,13 +39,13 @@ function main() {
     logging.warn('process.env.SB_METRICS_URL not set, using default');
   }
 
-  if (!publicAddress) {
+  if (!proxyHostname) {
     logging.error('Need to specify SB_PUBLIC_IP for invite links');
     process.exit(1);
   }
 
   logging.debug(`=== Config ===`);
-  logging.debug(`SB_PUBLIC_IP: ${publicAddress}`);
+  logging.debug(`SB_PUBLIC_IP: ${proxyHostname}`);
   logging.debug(`SB_METRICS_URL: ${metricsUrl}`);
   logging.debug(`==============`);
 
@@ -59,7 +59,7 @@ function main() {
   const serverConfigFilename = getPersistentFilename('shadowbox_server_config.json');
   const serverConfig = new server_config.ServerConfig(serverConfigFilename, process.env.SB_DEFAULT_SERVER_NAME);
 
-  const shadowsocksServer = new LibevShadowsocksServer(publicAddress, verbose);
+  const shadowsocksServer = new OutlineShadowsocksServer(getPersistentFilename("outline-ss-server.yml"));
 
   const statsFilename = getPersistentFilename('shadowbox_stats.json');
   const stats = new metrics.PersistentStats(statsFilename);
@@ -81,6 +81,7 @@ function main() {
   logging.info('Starting...');
   const userConfigFilename = getPersistentFilename('shadowbox_config.json');
   createManagedAccessKeyRepository(
+      proxyHostname,
       new FilesystemTextFile(userConfigFilename),
       shadowsocksServer,
       stats).then((managedAccessKeyRepository) => {
@@ -104,7 +105,6 @@ function main() {
     apiServer.use(restify.bodyParser());
     setApiHandlers(apiServer, apiPrefix, managerService, stats, serverConfig);
 
-    // TODO(fortuna): Bind to localhost or unix socket to avoid external access.
     apiServer.listen(portNumber, () => {
       logging.info(`Manager listening at ${apiServer.url}${apiPrefix}`);
     });

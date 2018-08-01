@@ -12,6 +12,7 @@
   "dependencies": {
     "ShadowsocksConfig": "https://github.com/Jigsaw-Code/outline-shadowsocksconfig/archive/v0.0.6.tar.gz",
     "ipaddr.js": "^1.4.0",
+    "js-yaml": "^3.12.0",
     "maxmind": "^2.7.0",
     "randomstring": "^1.1.5",
     "request-lite": "^2.40.1",
@@ -19,6 +20,7 @@
     "uuid": "^3.1.0"
   },
   "devDependencies": {
+    "@types/js-yaml": "^3.11.2",
     "@types/maxmind": "^2",
     "@types/node": "^8",
     "@types/randomstring": "^1.1.6",

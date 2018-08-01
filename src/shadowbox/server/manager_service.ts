@@ -13,6 +13,7 @@
 // limitations under the License.
 
 import * as restify from 'restify';
+import {makeConfig, SIP002_URI} from 'ShadowsocksConfig/shadowsocks_config';
 
 import * as logging from '../infrastructure/logging';
 import { AccessKey, AccessKeyRepository } from '../model/access_key';
@@ -25,10 +26,16 @@ function accessKeyToJson(accessKey: AccessKey) {
     // Admin-controlled, editable name for this access key.
     name: accessKey.name,
     // Shadowsocks-specific details and credentials.
-    password: accessKey.shadowsocksInstance.password,
-    port: accessKey.shadowsocksInstance.portNumber,
-    method: accessKey.shadowsocksInstance.encryptionMethod,
-    accessUrl: accessKey.shadowsocksInstance.accessUrl,
+    password: accessKey.proxyParams.password,
+    port: accessKey.proxyParams.portNumber,
+    method: accessKey.proxyParams.encryptionMethod,
+    accessUrl: SIP002_URI.stringify(makeConfig({
+      host: accessKey.proxyParams.hostname,
+      port: accessKey.proxyParams.portNumber,
+      method: accessKey.proxyParams.encryptionMethod,
+      password: accessKey.proxyParams.password,
+      outline: 1,
+    }))
   };
 }
 

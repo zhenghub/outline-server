@@ -16,15 +16,23 @@ import * as dgram from 'dgram';
 
 import {AccessKey, AccessKeyId, AccessKeyRepository} from '../../model/access_key';
 import {Stats} from '../../model/metrics';
-import {ShadowsocksInstance} from '../../model/shadowsocks_server';
 import {TextFile} from '../../model/text_file';
 
 export class MockAccessKeyRepository implements AccessKeyRepository {
   private accessKeys: AccessKey[] = [];
   createNewAccessKey(): Promise<AccessKey> {
     const id = this.accessKeys.length.toString();
-    const key = new MockAccessKey(
-        id, 'metricsId', 'name', new MockShadowsocksInstance());
+    const key = {
+        id,
+        name: 'name',
+        metricsId: 'metricsId',
+        proxyParams: {
+          hostname: 'hostname',
+          portNumber: 12345,
+          password: 'password',
+          encryptionMethod: 'chacha20-ietf-poly1305'
+        }
+    };
     this.accessKeys.push(key);
     return Promise.resolve(key);
   }
@@ -48,36 +56,6 @@ export class MockAccessKeyRepository implements AccessKeyRepository {
       }
     }
     return false;
-  }
-}
-
-class MockAccessKey implements AccessKey {
-  constructor(
-      public id: AccessKeyId,
-      public metricsId: AccessKeyId,
-      public name: string,
-      public shadowsocksInstance: ShadowsocksInstance) {}
-  public rename(name: string): void {
-    this.name = name;
-  }
-}
-
-class MockShadowsocksInstance implements ShadowsocksInstance {
-  constructor(
-      public portNumber = 12345,
-      public password = 'password',
-      public encryptionMethod = 'encryption',
-      public accessUrl = 'ss://somethingsomething') {}
-  onInboundBytes(callback: (bytes: number, ipAddresses: string[]) => void) {}
-  stop() {}
-}
-
-export class MockShadowsocksServer {
-  startInstance(
-      portNumber: number, password: string, statsSocket: dgram.Socket,
-      encryptionMethod?: string): Promise<ShadowsocksInstance> {
-    const mock = new MockShadowsocksInstance(portNumber, password, encryptionMethod);
-    return Promise.resolve(mock);
   }
 }
 
