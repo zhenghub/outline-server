@@ -163,6 +163,11 @@ export class ShadowsocksManagerService {
     }
   }
 
+  public getDataUsage(req: RequestType, res: ResponseType, next: restify.Next): void {
+    res.send(200, this.stats.get30DayByteTransfer());
+    next();
+  }
+
   public getShareMetrics(req: RequestType, res: ResponseType, next: restify.Next): void {
     res.send(200, {metricsEnabled: this.serverConfig.getMetricsEnabled()});
     next();
@@ -176,11 +181,6 @@ export class ShadowsocksManagerService {
     } else {
       res.send(400);
     }
-    next();
-  }
-
-  public getDataUsage(req: RequestType, res: ResponseType, next: restify.Next): void {
-    res.send(200, this.stats.get30DayByteTransfer());
     next();
   }
 }
