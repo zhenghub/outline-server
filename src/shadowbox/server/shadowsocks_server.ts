@@ -26,9 +26,7 @@ export interface AccessKey {
   secret: string;
 }
 
-export interface ShadowsocksServer {
-  update(keys: AccessKey[]): Promise<void>;
-}
+export interface ShadowsocksServer { update(keys: AccessKey[]): Promise<void>; }
 
 // Runs outline-ss-server.
 export class OutlineShadowsocksServer implements ShadowsocksServer {
@@ -64,9 +62,7 @@ export class OutlineShadowsocksServer implements ShadowsocksServer {
   }
 
   private start() {
-    const commandArguments = [
-      '-config', this.configFilename, '-metrics', 'localhost:8080'
-    ];
+    const commandArguments = ['-config', this.configFilename, '-metrics', 'localhost:8080'];
     this.ssProcess = child_process.spawn('/root/shadowbox/outline-ss-server', commandArguments);
     this.ssProcess.on('error', (error) => {
       logging.error(`Error spawning outline-ss-server: ${error}`);

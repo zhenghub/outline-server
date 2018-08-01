@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+import {access, rename} from 'fs';
+import {cipher} from 'node-forge';
 import * as randomstring from 'randomstring';
 import * as uuidv4 from 'uuid/v4';
 
@@ -22,8 +24,6 @@ import {Stats} from '../model/metrics';
 import {TextFile} from '../model/text_file';
 
 import {ShadowsocksServer} from './shadowsocks_server';
-import { access, rename } from 'fs';
-import { cipher } from 'node-forge';
 
 // The format as json of access keys in the config file.
 interface AccessKeyConfig {
@@ -61,12 +61,12 @@ class AccessKeyConfigFile {
       }
       throw err;
     }
-  
+
     // Ignore if the config file is empty.
     if (!configText) {
       return EMPTY_CONFIG;
     }
-  
+
     return JSON.parse(configText) as ConfigJson;
   }
 
@@ -90,27 +90,27 @@ function generatePassword(): string {
 }
 
 export function createManagedAccessKeyRepository(
-    proxyHostname: string,
-    textFile: TextFile, shadowsocksServer: ShadowsocksServer,
+    proxyHostname: string, textFile: TextFile, shadowsocksServer: ShadowsocksServer,
     stats: Stats): Promise<ManagedAccessKeyRepository> {
-    const configFile = new AccessKeyConfigFile(textFile);
+  const configFile = new AccessKeyConfigFile(textFile);
 
-    const configJson = configFile.loadConfig();
+  const configJson = configFile.loadConfig();
 
-    const reservedPorts = getReservedPorts(configJson.accessKeys);
-    let onceDefaultPort = Promise.resolve();
-    if (!configJson.defaultPort) {
-      onceDefaultPort = getRandomUnusedPort(reservedPorts).then((portNumber) => {
-        configJson.defaultPort = portNumber;
-        reservedPorts.add(portNumber);
-        configFile.saveConfig(configJson);
-      });
-    }
-    // Create and save the stats socket.
-    return onceDefaultPort.then(() => {
-      logging.debug(`Default port is: ${configJson.defaultPort}`);
-      return new ManagedAccessKeyRepository(proxyHostname, configFile, configJson, shadowsocksServer, stats);
+  const reservedPorts = getReservedPorts(configJson.accessKeys);
+  let onceDefaultPort = Promise.resolve();
+  if (!configJson.defaultPort) {
+    onceDefaultPort = getRandomUnusedPort(reservedPorts).then((portNumber) => {
+      configJson.defaultPort = portNumber;
+      reservedPorts.add(portNumber);
+      configFile.saveConfig(configJson);
     });
+  }
+  // Create and save the stats socket.
+  return onceDefaultPort.then(() => {
+    logging.debug(`Default port is: ${configJson.defaultPort}`);
+    return new ManagedAccessKeyRepository(
+        proxyHostname, configFile, configJson, shadowsocksServer, stats);
+  });
 }
 
 function makeAccessKey(hostname: string, accessKeyJson: AccessKeyConfig): AccessKey {
@@ -136,10 +136,8 @@ class ManagedAccessKeyRepository implements AccessKeyRepository {
   // TODO: private statsSocket: dgram.Socket;
 
   constructor(
-      private proxyHostname: string, 
-      private configFile: AccessKeyConfigFile,
-      private configJson: ConfigJson,
-      private shadowsocksServer: ShadowsocksServer,
+      private proxyHostname: string, private configFile: AccessKeyConfigFile,
+      private configJson: ConfigJson, private shadowsocksServer: ShadowsocksServer,
       private stats: Stats) {
     // TODO: Track metrics
     this.updateServer();
@@ -168,7 +166,7 @@ class ManagedAccessKeyRepository implements AccessKeyRepository {
     this.configJson.accessKeys.push(accessKeyJson);
     try {
       this.saveConfig();
-    } catch(error) {
+    } catch (error) {
       return Promise.reject(new Error(`Failed to save config: ${error}`));
     }
     return this.updateServer().then(() => {
@@ -198,8 +196,8 @@ class ManagedAccessKeyRepository implements AccessKeyRepository {
       if (accessKeyJson.id === id) {
         accessKeyJson.name = name;
         try {
-            this.saveConfig();
-        } catch(error) {
+          this.saveConfig();
+        } catch (error) {
           return false;
         }
         return true;
@@ -208,7 +206,9 @@ class ManagedAccessKeyRepository implements AccessKeyRepository {
     return false;
   }
 
-  private handleInboundBytes(accessKeyId: AccessKeyId, metricsId: AccessKeyId, inboundBytes: number, ipAddresses: string[]) {
+  private handleInboundBytes(
+      accessKeyId: AccessKeyId, metricsId: AccessKeyId, inboundBytes: number,
+      ipAddresses: string[]) {
     this.stats.recordBytesTransferred(accessKeyId, metricsId, inboundBytes, ipAddresses);
   }
 

@@ -23,15 +23,15 @@ export class MockAccessKeyRepository implements AccessKeyRepository {
   createNewAccessKey(): Promise<AccessKey> {
     const id = this.accessKeys.length.toString();
     const key = {
-        id,
-        name: 'name',
-        metricsId: 'metricsId',
-        proxyParams: {
-          hostname: 'hostname',
-          portNumber: 12345,
-          password: 'password',
-          encryptionMethod: 'chacha20-ietf-poly1305'
-        }
+      id,
+      name: 'name',
+      metricsId: 'metricsId',
+      proxyParams: {
+        hostname: 'hostname',
+        portNumber: 12345,
+        password: 'password',
+        encryptionMethod: 'chacha20-ietf-poly1305'
+      }
     };
     this.accessKeys.push(key);
     return Promise.resolve(key);

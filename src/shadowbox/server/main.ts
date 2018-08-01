@@ -21,11 +21,11 @@ import {FilesystemTextFile} from '../infrastructure/filesystem_text_file';
 import * as ip_location from '../infrastructure/ip_location';
 import * as logging from '../infrastructure/logging';
 
-import {OutlineShadowsocksServer, ShadowsocksServer} from './shadowsocks_server';
 import {createManagedAccessKeyRepository} from './managed_access_key';
 import {ShadowsocksManagerService} from './manager_service';
 import * as metrics from './metrics';
 import * as server_config from './server_config';
+import {OutlineShadowsocksServer, ShadowsocksServer} from './shadowsocks_server';
 
 const DEFAULT_STATE_DIR = '/root/shadowbox/persisted-state';
 
@@ -59,7 +59,8 @@ function main() {
   const serverConfigFilename = getPersistentFilename('shadowbox_server_config.json');
   const serverConfig = new server_config.ServerConfig(serverConfigFilename, process.env.SB_DEFAULT_SERVER_NAME);
 
-  const shadowsocksServer = new OutlineShadowsocksServer(getPersistentFilename("outline-ss-server.yml"));
+  const shadowsocksServer =
+      new OutlineShadowsocksServer(getPersistentFilename('outline-ss-server.yml'));
 
   const statsFilename = getPersistentFilename('shadowbox_stats.json');
   const stats = new metrics.PersistentStats(statsFilename);
@@ -81,34 +82,33 @@ function main() {
   logging.info('Starting...');
   const userConfigFilename = getPersistentFilename('shadowbox_config.json');
   createManagedAccessKeyRepository(
-      proxyHostname,
-      new FilesystemTextFile(userConfigFilename),
-      shadowsocksServer,
-      stats).then((managedAccessKeyRepository) => {
-    const managerService = new ShadowsocksManagerService(managedAccessKeyRepository);
-    const certificateFilename = process.env.SB_CERTIFICATE_FILE;
-    const privateKeyFilename = process.env.SB_PRIVATE_KEY_FILE;
+      proxyHostname, new FilesystemTextFile(userConfigFilename), shadowsocksServer, stats)
+      .then((managedAccessKeyRepository) => {
+        const managerService = new ShadowsocksManagerService(managedAccessKeyRepository);
+        const certificateFilename = process.env.SB_CERTIFICATE_FILE;
+        const privateKeyFilename = process.env.SB_PRIVATE_KEY_FILE;
 
-    // TODO(bemasc): Remove casts once https://github.com/DefinitelyTyped/DefinitelyTyped/pull/15229 lands
-    const apiServer = restify.createServer({
-      certificate: fs.readFileSync(certificateFilename),
-      key: fs.readFileSync(privateKeyFilename)
-    });
+        // TODO(bemasc): Remove casts once
+        // https://github.com/DefinitelyTyped/DefinitelyTyped/pull/15229 lands
+        const apiServer = restify.createServer({
+          certificate: fs.readFileSync(certificateFilename),
+          key: fs.readFileSync(privateKeyFilename)
+        });
 
-    // Pre-routing handlers
-    apiServer.pre(restify.CORS());
+        // Pre-routing handlers
+        apiServer.pre(restify.CORS());
 
-    // All routes handlers
-    const apiPrefix = process.env.SB_API_PREFIX ? `/${process.env.SB_API_PREFIX}` : '';
-    apiServer.pre(restify.pre.sanitizePath());
-    apiServer.use(restify.jsonp());
-    apiServer.use(restify.bodyParser());
-    setApiHandlers(apiServer, apiPrefix, managerService, stats, serverConfig);
+        // All routes handlers
+        const apiPrefix = process.env.SB_API_PREFIX ? `/${process.env.SB_API_PREFIX}` : '';
+        apiServer.pre(restify.pre.sanitizePath());
+        apiServer.use(restify.jsonp());
+        apiServer.use(restify.bodyParser());
+        setApiHandlers(apiServer, apiPrefix, managerService, stats, serverConfig);
 
-    apiServer.listen(portNumber, () => {
-      logging.info(`Manager listening at ${apiServer.url}${apiPrefix}`);
-    });
-  });
+        apiServer.listen(portNumber, () => {
+          logging.info(`Manager listening at ${apiServer.url}${apiPrefix}`);
+        });
+      });
 }
 
 function setApiHandlers(
