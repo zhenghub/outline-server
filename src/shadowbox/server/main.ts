@@ -22,7 +22,7 @@ import * as ip_location from '../infrastructure/ip_location';
 import * as logging from '../infrastructure/logging';
 
 import {createManagedAccessKeyRepository} from './managed_access_key';
-import {ShadowsocksManagerService, bindService} from './manager_service';
+import {bindService, ShadowsocksManagerService} from './manager_service';
 import * as metrics from './metrics';
 import * as server_config from './server_config';
 import {OutlineShadowsocksServer, ShadowsocksServer} from './shadowsocks_server';
@@ -84,7 +84,8 @@ function main() {
   createManagedAccessKeyRepository(
       proxyHostname, new FilesystemTextFile(userConfigFilename), shadowsocksServer, stats)
       .then((managedAccessKeyRepository) => {
-        const managerService = new ShadowsocksManagerService(serverConfig, managedAccessKeyRepository, stats);
+        const managerService =
+            new ShadowsocksManagerService(serverConfig, managedAccessKeyRepository, stats);
         const certificateFilename = process.env.SB_CERTIFICATE_FILE;
         const privateKeyFilename = process.env.SB_PRIVATE_KEY_FILE;
 

@@ -54,7 +54,8 @@ interface ResponseType {
   send(code: number, data?: {}): void;
 }
 
-export function bindService(apiServer: restify.Server, apiPrefix: string, service: ShadowsocksManagerService) {
+export function bindService(
+    apiServer: restify.Server, apiPrefix: string, service: ShadowsocksManagerService) {
   apiServer.put(`${apiPrefix}/name`, service.renameServer.bind(service));
   apiServer.get(`${apiPrefix}/server`, service.getServer.bind(service));
 
@@ -76,7 +77,10 @@ interface SetShareMetricsParams {
 // as a proxy using Shadowsocks. It runs an instance of the Shadowsocks server
 // for each existing access key, with the port and password assigned for that access key.
 export class ShadowsocksManagerService {
-  constructor(private serverConfig: server_config.ServerConfig, private accessKeys: AccessKeyRepository, private stats: metrics.PersistentStats,
+  constructor(
+      private serverConfig: server_config.ServerConfig,
+      private accessKeys: AccessKeyRepository,
+      private stats: metrics.PersistentStats,
   ) {}
 
   public renameServer(req: RequestType, res: ResponseType, next: restify.Next): void {
@@ -172,7 +176,7 @@ export class ShadowsocksManagerService {
     } else {
       res.send(400);
     }
-    next(); 
+    next();
   }
 
   public getDataUsage(req: RequestType, res: ResponseType, next: restify.Next): void {
