@@ -22,7 +22,7 @@ import * as ip_location from '../infrastructure/ip_location';
 import * as logging from '../infrastructure/logging';
 
 import {createManagedAccessKeyRepository} from './managed_access_key';
-import {ShadowsocksManagerService} from './manager_service';
+import {ShadowsocksManagerService, bindService} from './manager_service';
 import * as metrics from './metrics';
 import * as server_config from './server_config';
 import {OutlineShadowsocksServer, ShadowsocksServer} from './shadowsocks_server';
@@ -84,7 +84,7 @@ function main() {
   createManagedAccessKeyRepository(
       proxyHostname, new FilesystemTextFile(userConfigFilename), shadowsocksServer, stats)
       .then((managedAccessKeyRepository) => {
-        const managerService = new ShadowsocksManagerService(managedAccessKeyRepository);
+        const managerService = new ShadowsocksManagerService(serverConfig, managedAccessKeyRepository, stats);
         const certificateFilename = process.env.SB_CERTIFICATE_FILE;
         const privateKeyFilename = process.env.SB_PRIVATE_KEY_FILE;
 
@@ -103,67 +103,12 @@ function main() {
         apiServer.pre(restify.pre.sanitizePath());
         apiServer.use(restify.jsonp());
         apiServer.use(restify.bodyParser());
-        setApiHandlers(apiServer, apiPrefix, managerService, stats, serverConfig);
+        bindService(apiServer, apiPrefix, managerService);
 
         apiServer.listen(portNumber, () => {
           logging.info(`Manager listening at ${apiServer.url}${apiPrefix}`);
         });
       });
-}
-
-function setApiHandlers(
-    apiServer: restify.Server,
-    apiPrefix: string,
-    managerService: ShadowsocksManagerService,
-    stats: metrics.PersistentStats,
-    serverConfig: server_config.ServerConfig) {
-  // Access key service handlers
-  apiServer.post(`${apiPrefix}/access-keys`, managerService.createNewAccessKey.bind(managerService));
-  apiServer.get(`${apiPrefix}/access-keys`, managerService.listAccessKeys.bind(managerService));
-  apiServer.del(`${apiPrefix}/access-keys/:id`, managerService.removeAccessKey.bind(managerService));
-  apiServer.put(`${apiPrefix}/access-keys/:id/name`, managerService.renameAccessKey.bind(managerService));
-
-  // Metrics handlers.
-  apiServer.get(`${apiPrefix}/metrics/transfer`, (req, res, next) => {
-    res.send(stats.get30DayByteTransfer());
-    next();
-  });
-  apiServer.get(`${apiPrefix}/metrics/enabled`, (req, res, next) => {
-    res.send({metricsEnabled: serverConfig.getMetricsEnabled()});
-    next();
-  });
-  apiServer.put(`${apiPrefix}/metrics/enabled`, (req, res, next) => {
-    if (typeof req.params.metricsEnabled === 'boolean') {
-      serverConfig.setMetricsEnabled(req.params.metricsEnabled);
-      res.send(204);
-    } else {
-      res.send(400);
-    }
-    next();
-  });
-
-  // Rename handler.
-  apiServer.put(`${apiPrefix}/name`, (req, res, next) => {
-    const name = req.params.name;
-    if (typeof name !== 'string' || name.length > 100) {
-      res.send(400);
-      next();
-      return;
-    }
-    serverConfig.setName(name);
-    res.send(204);
-    next();
-  });
-
-  apiServer.get(`${apiPrefix}/server`, (req, res, next) => {
-    res.send({
-      name: serverConfig.getName(),
-      serverId: serverConfig.serverId,
-      metricsEnabled: serverConfig.getMetricsEnabled(),
-      createdTimestampMs: serverConfig.getCreatedTimestampMs()
-    });
-    next();
-  });
 }
 
 function getPersistentFilename(file: string): string {
