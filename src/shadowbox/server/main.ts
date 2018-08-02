@@ -20,6 +20,7 @@ import * as restify from 'restify';
 import {FilesystemTextFile} from '../infrastructure/filesystem_text_file';
 import * as ip_location from '../infrastructure/ip_location';
 import * as logging from '../infrastructure/logging';
+import {runPrometheusScraper} from '../infrastructure/prometheus_scraper';
 
 import {createManagedAccessKeyRepository} from './managed_access_key';
 import {bindService, ShadowsocksManagerService} from './manager_service';
@@ -56,11 +57,31 @@ function main() {
     process.exit(1);
   }
 
-  const serverConfigFilename = getPersistentFilename('shadowbox_server_config.json');
-  const serverConfig = new server_config.ServerConfig(serverConfigFilename, process.env.SB_DEFAULT_SERVER_NAME);
+  const prometheusMetricsLocation = "localhost:9090";
+  const ssMetricsLocation = "localhost:9091";
+  fs.mkdirSync(getPersistentFilename('prometheus'));
+  runPrometheusScraper([
+      '--storage.tsdb.retention', '31d',
+      '--storage.tsdb.path', getPersistentFilename('prometheus/data'),
+      '--web.listen-address', prometheusMetricsLocation
+    ],
+    getPersistentFilename('prometheus/config.yml'), {
+      scrape_configs: [
+          {
+              job_name: 'outline-ss-server',
+              scrape_interval: '5s',
+              static_configs: [{targets: [ssMetricsLocation]}]
+          }    
+      ]
+    }
+  );
 
+  const serverConfig = new server_config.ServerConfig(getPersistentFilename('shadowbox_server_config.json'),
+      process.env.SB_DEFAULT_SERVER_NAME);
+
+  fs.mkdirSync(getPersistentFilename('outline-ss-server'));
   const shadowsocksServer =
-      new OutlineShadowsocksServer(getPersistentFilename('outline-ss-server.yml'));
+      new OutlineShadowsocksServer(getPersistentFilename('outline-ss-server/config.yml'), ssMetricsLocation);
 
   const statsFilename = getPersistentFilename('shadowbox_stats.json');
   const stats = new metrics.PersistentStats(statsFilename);

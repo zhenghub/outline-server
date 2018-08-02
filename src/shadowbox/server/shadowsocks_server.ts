@@ -32,7 +32,7 @@ export interface ShadowsocksServer { update(keys: AccessKey[]): Promise<void>; }
 export class OutlineShadowsocksServer implements ShadowsocksServer {
   private ssProcess: child_process.ChildProcess;
   // configFilename is the location for the outline-ss-server config.
-  constructor(private configFilename: string) {}
+  constructor(private configFilename: string, private metricsLocation: string) {}
 
   private writeConfigFile(keys: AccessKey[]): Promise<void> {
     const keysJson = {keys: [] as AccessKey[]};
@@ -62,8 +62,8 @@ export class OutlineShadowsocksServer implements ShadowsocksServer {
   }
 
   private start() {
-    const commandArguments = ['-config', this.configFilename, '-metrics', 'localhost:8080'];
-    this.ssProcess = child_process.spawn('/root/shadowbox/outline-ss-server', commandArguments);
+    const commandArguments = ['-config', this.configFilename, '-metrics', this.metricsLocation];
+    this.ssProcess = child_process.spawn('/root/shadowbox/bin/outline-ss-server', commandArguments);
     this.ssProcess.on('error', (error) => {
       logging.error(`Error spawning outline-ss-server: ${error}`);
     });

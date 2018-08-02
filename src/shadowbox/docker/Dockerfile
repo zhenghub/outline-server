@@ -17,7 +17,7 @@ FROM golang:1-alpine as ss-example
 
 RUN apk add --no-cache git
 RUN git clone -b ss-lib https://github.com/fortuna/go-shadowsocks2.git /go/src/github.com/shadowsocks/go-shadowsocks2
-RUN go get github.com/Jigsaw-Code/outline-ss-server
+RUN go get github.com/Jigsaw-Code/outline-ss-server github.com/prometheus/prometheus/cmd/...
 
 FROM node:8.11.3-alpine
 
@@ -35,15 +35,16 @@ RUN /etc/periodic/weekly/update_mmdb
 
 WORKDIR /root/shadowbox
 
-COPY --from=ss-example /go/bin/outline-ss-server .
-
-# Install management service
-COPY build/shadowbox/app app/
 COPY src/shadowbox/package.json .
 COPY yarn.lock .
 # TODO: Replace with plain old "yarn" once the base image is fixed:
 #       https://github.com/nodejs/docker-node/pull/639
 RUN /opt/yarn-v$YARN_VERSION/bin/yarn install --prod
+
+COPY --from=ss-example /go/bin/outline-ss-server /go/bin/prometheus ./bin/
+
+# Install management service
+COPY build/shadowbox/app app/
 
 # Create default state directory.
 RUN mkdir -p /root/shadowbox/persisted-state
