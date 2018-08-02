@@ -20,28 +20,29 @@ import * as jsyaml from 'js-yaml';
 
 import * as logging from '../infrastructure/logging';
 
-export function runPrometheusScraper(args: string[], configFilename: string, configJson: {}): Promise<child_process.ChildProcess> {
-    const ymlTxt = jsyaml.safeDump(configJson, {'sortKeys': true});
-    return new Promise((resolve, reject) => {
-      fs.writeFile(configFilename, ymlTxt, 'utf-8', (err) => {
-        if (err) {
-          reject(err);
-        }
-        const commandArguments = ['--config.file', configFilename];
-        commandArguments.push(...args);
-        const runProcess = child_process.spawn('/root/shadowbox/bin/prometheus', commandArguments);
-        runProcess.on('error', (error) => {
-          logging.error(`Error spawning prometheus: ${error}`);
-        });
-        // TODO(fortuna): Add restart logic.
-        runProcess.on('exit', (code, signal) => {
-          logging.info(`prometheus has exited with error. Code: ${code}, Signal: ${signal}`);
-        });
-        // TODO(fortuna): Disable this for production.
-        // TODO(fortuna): Consider saving the output and expose it through the manager service.
-        runProcess.stdout.pipe(process.stdout);
-        runProcess.stderr.pipe(process.stderr);
-        resolve(runProcess);
+export function runPrometheusScraper(
+    args: string[], configFilename: string, configJson: {}): Promise<child_process.ChildProcess> {
+  const ymlTxt = jsyaml.safeDump(configJson, {'sortKeys': true});
+  return new Promise((resolve, reject) => {
+    fs.writeFile(configFilename, ymlTxt, 'utf-8', (err) => {
+      if (err) {
+        reject(err);
+      }
+      const commandArguments = ['--config.file', configFilename];
+      commandArguments.push(...args);
+      const runProcess = child_process.spawn('/root/shadowbox/bin/prometheus', commandArguments);
+      runProcess.on('error', (error) => {
+        logging.error(`Error spawning prometheus: ${error}`);
       });
-    });  
+      // TODO(fortuna): Add restart logic.
+      runProcess.on('exit', (code, signal) => {
+        logging.info(`prometheus has exited with error. Code: ${code}, Signal: ${signal}`);
+      });
+      // TODO(fortuna): Disable this for production.
+      // TODO(fortuna): Consider saving the output and expose it through the manager service.
+      runProcess.stdout.pipe(process.stdout);
+      runProcess.stderr.pipe(process.stderr);
+      resolve(runProcess);
+    });
+  });
 }
