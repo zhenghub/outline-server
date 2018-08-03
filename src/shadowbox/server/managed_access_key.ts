@@ -145,7 +145,7 @@ class ManagedAccessKeyRepository implements AccessKeyRepository {
 
   private updateServer(): Promise<void> {
     return this.shadowsocksServer.update(this.configJson.accessKeys.map((e) => {
-      return {id: e.metricsId, port: e.port, cipher: e.encryptionMethod, secret: e.password};
+      return {id: e.id, port: e.port, cipher: e.encryptionMethod, secret: e.password};
     }));
   }
 
