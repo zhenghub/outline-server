@@ -15,13 +15,15 @@
 
 import * as child_process from 'child_process';
 import * as fs from 'fs';
+import * as path from 'path';
 
 import * as jsyaml from 'js-yaml';
-
+import * as mkdirp from 'mkdirp';
 import * as logging from '../infrastructure/logging';
 
 export function runPrometheusScraper(
     args: string[], configFilename: string, configJson: {}): Promise<child_process.ChildProcess> {
+  mkdirp.sync(path.dirname(configFilename));
   const ymlTxt = jsyaml.safeDump(configJson, {'sortKeys': true});
   return new Promise((resolve, reject) => {
     fs.writeFile(configFilename, ymlTxt, 'utf-8', (err) => {

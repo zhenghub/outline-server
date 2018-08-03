@@ -14,8 +14,10 @@
 
 import * as child_process from 'child_process';
 import * as fs from 'fs';
+import * as path from 'path';
 
 import * as jsyaml from 'js-yaml';
+import * as mkdirp from 'mkdirp';
 
 import * as logging from '../infrastructure/logging';
 
@@ -41,6 +43,7 @@ export class OutlineShadowsocksServer implements ShadowsocksServer {
     }
     const ymlTxt = jsyaml.safeDump(keysJson, {'sortKeys': true});
     return new Promise((resolve, reject) => {
+      mkdirp.sync(path.dirname(this.configFilename));
       fs.writeFile(this.configFilename, ymlTxt, 'utf-8', (err) => {
         if (err) {
           reject(err);

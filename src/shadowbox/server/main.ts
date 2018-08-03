@@ -59,7 +59,6 @@ function main() {
 
   const prometheusMetricsLocation = 'localhost:9090';
   const ssMetricsLocation = 'localhost:9091';
-  fs.mkdirSync(getPersistentFilename('prometheus'));
   runPrometheusScraper(
       [
         '--storage.tsdb.retention', '31d', '--storage.tsdb.path',
@@ -76,7 +75,6 @@ function main() {
   const serverConfig = new server_config.ServerConfig(
       getPersistentFilename('shadowbox_server_config.json'), process.env.SB_DEFAULT_SERVER_NAME);
 
-  fs.mkdirSync(getPersistentFilename('outline-ss-server'));
   const shadowsocksServer = new OutlineShadowsocksServer(
       getPersistentFilename('outline-ss-server/config.yml'), ssMetricsLocation);
 
