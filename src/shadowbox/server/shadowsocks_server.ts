@@ -14,10 +14,9 @@
 
 import * as child_process from 'child_process';
 import * as fs from 'fs';
-import * as path from 'path';
-
 import * as jsyaml from 'js-yaml';
 import * as mkdirp from 'mkdirp';
+import * as path from 'path';
 
 import * as logging from '../infrastructure/logging';
 
