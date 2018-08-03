@@ -69,9 +69,10 @@ export class OutlineShadowsocksServer implements ShadowsocksServer {
     this.ssProcess.on('error', (error) => {
       logging.error(`Error spawning outline-ss-server: ${error}`);
     });
-    // TODO(fortuna): Add restart logic.
     this.ssProcess.on('exit', (code, signal) => {
       logging.info(`outline-ss-server has exited with error. Code: ${code}, Signal: ${signal}`);
+      logging.info(`Restarting`);
+      this.start();
     });
     // TODO(fortuna): Disable this for production.
     // TODO(fortuna): Consider saving the output and expose it through the manager service.
