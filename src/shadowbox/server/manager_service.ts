@@ -174,7 +174,6 @@ export class ShadowsocksManagerService {
           'sum(increase(shadowsocks_data_bytes{dir=~"c<p|p>t"}[30d])) by (access_key)');
       const usage = {} as {[userId: string]: number};
       for (const entry of result.result) {
-        console.log(JSON.stringify(entry));
         usage[entry.metric['access_key'] || ''] = parseFloat(entry.value[1]);
       }
       res.send(200, {bytesTransferredByUserId: usage} as metrics_model.DataUsageByUser);
