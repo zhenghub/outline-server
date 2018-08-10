@@ -168,10 +168,10 @@ export class ShadowsocksManagerService {
 
   public async getDataUsage(req: RequestType, res: ResponseType, next: restify.Next) {
     try {
-      // We currently only show the data that leaves the proxy, since that's what DigitalOcean measures.
+      // We currently only show the data that leaves the proxy, since that's what DigitalOcean
+      // measures.
       const result = await this.prometheusClient.query(
-        'sum(increase(shadowsocks_data_bytes{dir=~"c<p|p>t"}[30d])) by (access_key)'
-      );
+          'sum(increase(shadowsocks_data_bytes{dir=~"c<p|p>t"}[30d])) by (access_key)');
       const usage = {} as {[userId: string]: number};
       for (const entry of result.result) {
         console.log(JSON.stringify(entry));

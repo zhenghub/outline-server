@@ -15,58 +15,59 @@
 
 import * as child_process from 'child_process';
 import * as fs from 'fs';
+import * as http from 'http';
+import {url} from 'inspector';
 import * as jsyaml from 'js-yaml';
 import * as mkdirp from 'mkdirp';
 import * as path from 'path';
-import * as http from 'http';
 
 import * as logging from '../infrastructure/logging';
-import { url } from 'inspector';
 
 export interface QueryResultData {
-    resultType: "matrix" | "vector" | "scalar" | "string";
-    result: Array<{
-        metric: {
-            [labelValue: string]: string
-        };
-        value: [number, string];
-    }>;
+  resultType: 'matrix'|'vector'|'scalar'|'string';
+  result: Array < {
+    metric: {[labelValue: string]: string};
+    value: [number, string];
+  }
+  > ;
 }
 
 // From https://prometheus.io/docs/prometheus/latest/querying/api/
 interface QueryResult {
-  status: "success" | "error";
+  status: 'success'|'error';
   data: QueryResultData;
   errorType: string;
   error: string;
 }
 
 export class PrometheusClient {
-    constructor(private address: string) {}
+  constructor(private address: string) {}
 
-    query(query: string): Promise<QueryResultData> {
-        return new Promise<QueryResultData>((fulfill, reject) => {
-            const url = `${this.address}/api/v1/query?query=${encodeURIComponent(query)}`;
-            http.get(url, (response) => {
-              if (response.statusCode < 200 || response.statusCode > 299) {
-                reject(new Error(`Got error ${response.statusCode}`));
-                response.resume();
-                return;
-              }
-              let body = '';
-              response.on('data', (data) => { body += data; });
-              response.on('end', () => {
-                  const result = JSON.parse(body) as QueryResult;
-                  if (result.status !== 'success') {
-                      return reject(new Error(`Error ${result.errorType}: ${result.error}`));
-                  }
-                  fulfill(result.data);
-              });
-            }).on('error', (e) => {
-              reject(new Error(`Failed to query prometheus API: ${e}`));
+  query(query: string): Promise<QueryResultData> {
+    return new Promise<QueryResultData>((fulfill, reject) => {
+      const url = `${this.address}/api/v1/query?query=${encodeURIComponent(query)}`;
+      http.get(url, (response) => {
+            if (response.statusCode < 200 || response.statusCode > 299) {
+              reject(new Error(`Got error ${response.statusCode}`));
+              response.resume();
+              return;
+            }
+            let body = '';
+            response.on('data', (data) => {
+              body += data;
             });
-        });
-    }
+            response.on('end', () => {
+              const result = JSON.parse(body) as QueryResult;
+              if (result.status !== 'success') {
+                return reject(new Error(`Error ${result.errorType}: ${result.error}`));
+              }
+              fulfill(result.data);
+            });
+          }).on('error', (e) => {
+        reject(new Error(`Failed to query prometheus API: ${e}`));
+      });
+    });
+  }
 }
 
 export function runPrometheusScraper(

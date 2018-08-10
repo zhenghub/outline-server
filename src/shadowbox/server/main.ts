@@ -20,7 +20,7 @@ import * as restify from 'restify';
 import {FilesystemTextFile} from '../infrastructure/filesystem_text_file';
 import * as ip_location from '../infrastructure/ip_location';
 import * as logging from '../infrastructure/logging';
-import {runPrometheusScraper, PrometheusClient} from '../infrastructure/prometheus_scraper';
+import {PrometheusClient, runPrometheusScraper} from '../infrastructure/prometheus_scraper';
 
 import {createManagedAccessKeyRepository} from './managed_access_key';
 import {bindService, ShadowsocksManagerService} from './manager_service';
@@ -100,9 +100,9 @@ function main() {
   createManagedAccessKeyRepository(
       proxyHostname, new FilesystemTextFile(userConfigFilename), shadowsocksServer, stats)
       .then((managedAccessKeyRepository) => {
-        const managerService =
-            new ShadowsocksManagerService(serverConfig, managedAccessKeyRepository,
-                new PrometheusClient(`http://${prometheusMetricsLocation}`), stats);
+        const managerService = new ShadowsocksManagerService(
+            serverConfig, managedAccessKeyRepository,
+            new PrometheusClient(`http://${prometheusMetricsLocation}`), stats);
         const certificateFilename = process.env.SB_CERTIFICATE_FILE;
         const privateKeyFilename = process.env.SB_PRIVATE_KEY_FILE;
 
