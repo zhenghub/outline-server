@@ -16,7 +16,9 @@ import * as restify from 'restify';
 import {makeConfig, SIP002_URI} from 'ShadowsocksConfig/shadowsocks_config';
 
 import * as logging from '../infrastructure/logging';
+import {PrometheusClient} from '../infrastructure/prometheus_scraper';
 import { AccessKey, AccessKeyRepository } from '../model/access_key';
+import * as metrics_model from '../model/metrics';
 import * as metrics from './metrics';
 import * as server_config from './server_config';
 
@@ -80,6 +82,7 @@ export class ShadowsocksManagerService {
   constructor(
       private serverConfig: server_config.ServerConfig,
       private accessKeys: AccessKeyRepository,
+      private prometheusClient: PrometheusClient,
       private stats: metrics.PersistentStats,
   ) {}
 
@@ -163,9 +166,23 @@ export class ShadowsocksManagerService {
     }
   }
 
-  public getDataUsage(req: RequestType, res: ResponseType, next: restify.Next): void {
-    res.send(200, this.stats.get30DayByteTransfer());
-    next();
+  public async getDataUsage(req: RequestType, res: ResponseType, next: restify.Next) {
+    try {
+      // We currently only show the data that leaves the proxy, since that's what DigitalOcean measures.
+      const result = await this.prometheusClient.query(
+        'sum(increase(shadowsocks_data_bytes{dir=~"c<p|p>t"}[30d])) by (access_key)'
+      );
+      const usage = {} as {[userId: string]: number};
+      for (const entry of result.result) {
+        console.log(JSON.stringify(entry));
+        usage[entry.metric['access_key'] || ''] = parseFloat(entry.value[1]);
+      }
+      res.send(200, {bytesTransferredByUserId: usage} as metrics_model.DataUsageByUser);
+      return next();
+    } catch (error) {
+      logging.error(error);
+      return next(new restify.InternalServerError());
+    }
   }
 
   public getShareMetrics(req: RequestType, res: ResponseType, next: restify.Next): void {
