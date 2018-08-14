@@ -65,9 +65,11 @@ function main() {
         getPersistentFilename('prometheus/data'), '--web.listen-address', prometheusMetricsLocation
       ],
       getPersistentFilename('prometheus/config.yml'), {
+        global: {
+          scrape_interval: '15s',
+        },
         scrape_configs: [{
           job_name: 'outline-ss-server',
-          scrape_interval: '10s',
           static_configs: [{targets: [ssMetricsLocation]}]
         }]
       });
