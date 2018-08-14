@@ -67,7 +67,7 @@ function main() {
       getPersistentFilename('prometheus/config.yml'), {
         scrape_configs: [{
           job_name: 'outline-ss-server',
-          scrape_interval: '5s',
+          scrape_interval: '10s',
           static_configs: [{targets: [ssMetricsLocation]}]
         }]
       });
