@@ -69,6 +69,9 @@ function main() {
           scrape_interval: '15s',
         },
         scrape_configs: [{
+          job_name: 'prometheus',
+          static_configs: [{targets: [prometheusMetricsLocation]}]
+        },{
           job_name: 'outline-ss-server',
           static_configs: [{targets: [ssMetricsLocation]}]
         }]
