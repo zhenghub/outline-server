@@ -82,7 +82,7 @@ function main() {
 
   const shadowsocksServer = new OutlineShadowsocksServer(
       getPersistentFilename('outline-ss-server/config.yml'), verbose, ssMetricsLocation,
-                            '/var/lib/libmaxminddb/GeoLite2-Country.mmdb');
+      '/var/lib/libmaxminddb/GeoLite2-Country.mmdb');
 
   const statsFilename = getPersistentFilename('shadowbox_stats.json');
   const stats = new metrics.PersistentStats(statsFilename);
