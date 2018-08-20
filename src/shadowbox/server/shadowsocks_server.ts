@@ -34,7 +34,8 @@ export class OutlineShadowsocksServer implements ShadowsocksServer {
   private ssProcess: child_process.ChildProcess;
   // configFilename is the location for the outline-ss-server config.
   constructor(
-      private configFilename: string, private verbose: boolean, private metricsLocation: string) {}
+      private configFilename: string, private verbose: boolean, private metricsLocation: string,
+      private ipCountryLocation: string) {}
 
   private writeConfigFile(keys: AccessKey[]): Promise<void> {
     const keysJson = {keys: [] as AccessKey[]};
@@ -66,6 +67,9 @@ export class OutlineShadowsocksServer implements ShadowsocksServer {
 
   private start() {
     const commandArguments = ['-config', this.configFilename, '-metrics', this.metricsLocation];
+    if (this.ipCountryLocation) {
+      commandArguments.push('-ip_country_db', this.ipCountryLocation);
+    }
     if (this.verbose) {
       commandArguments.push('-verbose');
     }
