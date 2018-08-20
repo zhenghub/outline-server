@@ -33,7 +33,8 @@ export interface ShadowsocksServer { update(keys: AccessKey[]): Promise<void>; }
 export class OutlineShadowsocksServer implements ShadowsocksServer {
   private ssProcess: child_process.ChildProcess;
   // configFilename is the location for the outline-ss-server config.
-  constructor(private configFilename: string, private verbose: boolean, private metricsLocation: string) {}
+  constructor(
+      private configFilename: string, private verbose: boolean, private metricsLocation: string) {}
 
   private writeConfigFile(keys: AccessKey[]): Promise<void> {
     const keysJson = {keys: [] as AccessKey[]};
