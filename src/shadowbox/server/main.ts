@@ -81,7 +81,7 @@ function main() {
       getPersistentFilename('shadowbox_server_config.json'), process.env.SB_DEFAULT_SERVER_NAME);
 
   const shadowsocksServer = new OutlineShadowsocksServer(
-      getPersistentFilename('outline-ss-server/config.yml'), ssMetricsLocation);
+      getPersistentFilename('outline-ss-server/config.yml'), verbose, ssMetricsLocation);
 
   const statsFilename = getPersistentFilename('shadowbox_stats.json');
   const stats = new metrics.PersistentStats(statsFilename);
