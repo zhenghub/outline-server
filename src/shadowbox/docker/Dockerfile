@@ -16,7 +16,6 @@
 FROM golang:1-alpine as ss-example
 
 RUN apk add --no-cache git
-RUN git clone -b ss-lib https://github.com/fortuna/go-shadowsocks2.git /go/src/github.com/shadowsocks/go-shadowsocks2
 RUN go get github.com/Jigsaw-Code/outline-ss-server github.com/prometheus/prometheus/cmd/...
 
 FROM node:8.11.3-alpine
