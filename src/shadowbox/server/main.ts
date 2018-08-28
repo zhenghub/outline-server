@@ -61,8 +61,10 @@ function main() {
   const ssMetricsLocation = 'localhost:9091';
   runPrometheusScraper(
       [
-        '--storage.tsdb.retention', '31d', '--storage.tsdb.path',
-        getPersistentFilename('prometheus/data'), '--web.listen-address', prometheusMetricsLocation
+        '--storage.tsdb.retention', '31d',
+        '--storage.tsdb.path', getPersistentFilename('prometheus/data'),
+        '--web.listen-address', prometheusMetricsLocation,
+        '--log.level', verbose ? 'debug' : 'info'
       ],
       getPersistentFilename('prometheus/config.yml'), {
         global: {
