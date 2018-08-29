@@ -19,7 +19,7 @@ import * as logging from '../infrastructure/logging';
 import {PrometheusClient} from '../infrastructure/prometheus_scraper';
 import { AccessKey, AccessKeyRepository } from '../model/access_key';
 import * as metrics_model from '../model/metrics';
-import * as metrics from './metrics';
+import * as reported_metrics from './reported_metrics';
 import * as server_config from './server_config';
 
 // Creates a AccessKey response.
@@ -83,7 +83,7 @@ export class ShadowsocksManagerService {
       private serverConfig: server_config.ServerConfig,
       private accessKeys: AccessKeyRepository,
       private prometheusClient: PrometheusClient,
-      private stats: metrics.PersistentStats,
+      private stats: reported_metrics.PersistentStats,
   ) {}
 
   public renameServer(req: RequestType, res: ResponseType, next: restify.Next): void {

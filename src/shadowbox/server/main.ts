@@ -24,7 +24,7 @@ import {PrometheusClient, runPrometheusScraper} from '../infrastructure/promethe
 
 import {createManagedAccessKeyRepository} from './managed_access_key';
 import {bindService, ShadowsocksManagerService} from './manager_service';
-import * as metrics from './metrics';
+import * as reported_metrics from './reported_metrics';
 import * as server_config from './server_config';
 import {OutlineShadowsocksServer} from './shadowsocks_server';
 
@@ -87,17 +87,17 @@ function main() {
       '/var/lib/libmaxminddb/GeoLite2-Country.mmdb');
 
   const statsFilename = getPersistentFilename('shadowbox_stats.json');
-  const stats = new metrics.PersistentStats(statsFilename);
+  const stats = new reported_metrics.PersistentStats(statsFilename);
   const ipLocationService = new ip_location.MmdbLocationService();
   stats.onLastHourMetricsReady((startDatetime, endDatetime, lastHourUserStats) => {
     if (serverConfig.getMetricsEnabled()) {
-      metrics
+      reported_metrics
           .getHourlyServerMetricsReport(
               serverConfig.serverId, startDatetime, endDatetime, lastHourUserStats,
               ipLocationService)
           .then((report) => {
             if (report) {
-              metrics.postHourlyServerMetricsReports(report, metricsUrl);
+              reported_metrics.postHourlyServerMetricsReports(report, metricsUrl);
             }
           });
     }
