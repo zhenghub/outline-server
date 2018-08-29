@@ -16,7 +16,7 @@
 FROM golang:1-alpine as ss-example
 
 RUN apk add --no-cache git
-RUN go get github.com/Jigsaw-Code/outline-ss-server github.com/prometheus/prometheus/cmd/...
+RUN go get github.com/Jigsaw-Code/outline-ss-server
 
 FROM node:8.11.3-alpine
 
@@ -34,13 +34,14 @@ RUN /etc/periodic/weekly/update_mmdb
 
 WORKDIR /root/shadowbox
 
+COPY third_party/prometheus/prometheus ./bin/
 COPY src/shadowbox/package.json .
 COPY yarn.lock .
 # TODO: Replace with plain old "yarn" once the base image is fixed:
 #       https://github.com/nodejs/docker-node/pull/639
 RUN /opt/yarn-v$YARN_VERSION/bin/yarn install --prod
 
-COPY --from=ss-example /go/bin/outline-ss-server /go/bin/prometheus ./bin/
+COPY --from=ss-example /go/bin/outline-ss-server ./bin/
 
 # Install management service
 COPY build/shadowbox/app app/
