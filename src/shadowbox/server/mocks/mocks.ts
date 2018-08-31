@@ -12,10 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import * as dgram from 'dgram';
-
 import {AccessKey, AccessKeyId, AccessKeyRepository} from '../../model/access_key';
-import {Stats} from '../../model/metrics';
 import {TextFile} from '../../model/text_file';
 
 export class MockAccessKeyRepository implements AccessKeyRepository {

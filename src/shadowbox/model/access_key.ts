@@ -14,13 +14,19 @@
 
 export type AccessKeyId = string;
 
+// Parameters needed to access a Shadowsocks proxy.
 export interface ProxyParams {
+  // Hostname of the proxy
   hostname: string;
+  // Number of the port where the Shadowsocks service is running.
   portNumber: number;
+  // The Shadowsocks encryption method being used.
   encryptionMethod: string;
+  // The password for the encryption.
   password: string;
 }
 
+// AccessKey is what admins work with. It gives ProxyParams a name and identity.
 export interface AccessKey {
   // The unique identifier for this access key.
   id: AccessKeyId;

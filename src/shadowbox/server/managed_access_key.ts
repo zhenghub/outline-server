@@ -12,14 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import {access, rename} from 'fs';
-import {cipher} from 'node-forge';
 import * as randomstring from 'randomstring';
 import * as uuidv4 from 'uuid/v4';
 
 import {getRandomUnusedPort} from '../infrastructure/get_port';
 import * as logging from '../infrastructure/logging';
-import {AccessKey, AccessKeyId, AccessKeyRepository, ProxyParams} from '../model/access_key';
+import {AccessKey, AccessKeyId, AccessKeyRepository} from '../model/access_key';
 import {Stats} from '../model/metrics';
 import {TextFile} from '../model/text_file';
 

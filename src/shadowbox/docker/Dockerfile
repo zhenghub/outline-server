@@ -34,14 +34,14 @@ RUN /etc/periodic/weekly/update_mmdb
 
 WORKDIR /root/shadowbox
 
+COPY --from=ss-example /go/bin/outline-ss-server ./bin/
 COPY third_party/prometheus/prometheus ./bin/
+
 COPY src/shadowbox/package.json .
 COPY yarn.lock .
 # TODO: Replace with plain old "yarn" once the base image is fixed:
 #       https://github.com/nodejs/docker-node/pull/639
 RUN /opt/yarn-v$YARN_VERSION/bin/yarn install --prod
-
-COPY --from=ss-example /go/bin/outline-ss-server ./bin/
 
 # Install management service
 COPY build/shadowbox/app app/
