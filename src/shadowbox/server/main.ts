@@ -13,16 +13,19 @@
 // limitations under the License.
 
 import * as fs from 'fs';
+import * as http from 'http';
 import * as path from 'path';
 import * as process from 'process';
+import * as prometheus from 'prom-client';
 import * as restify from 'restify';
 
 import {FilesystemTextFile} from '../infrastructure/filesystem_text_file';
 import * as ip_location from '../infrastructure/ip_location';
 import * as json_config from '../infrastructure/json_config';
 import * as logging from '../infrastructure/logging';
+import {PrometheusClient, runPrometheusScraper} from '../infrastructure/prometheus_scraper';
 
-import {LibevShadowsocksServer} from './libev_shadowsocks_server';
+import {createShadowsocksMetrics} from './libev_shadowsocks_server';
 import {ManagerMetrics, ManagerMetricsJson} from './manager_metrics';
 import {bindService, ShadowsocksManagerService} from './manager_service';
 import {createServerAccessKeyRepository} from './server_access_key';
@@ -55,8 +58,26 @@ function readMetricsConfig(filename: string): json_config.JsonConfig<MetricsConf
   }
 }
 
-function main() {
+async function exportPrometheusMetrics(registry: prometheus.Registry): Promise<string> {
+  const localMetricsServer = await new Promise<http.Server>((resolve, _) => {
+    const server = http.createServer((_, res) => {
+      res.write(registry.metrics());
+      res.end();
+    });
+    server.on('listening', () => {
+      resolve(server);
+    });
+    server.listen({port: 0, host: 'localhost', exclusive: true});
+  });
+  return `localhost:${localMetricsServer.address().port}`;
+}
+
+async function main() {
   const verbose = process.env.LOG_LEVEL === 'debug';
+  prometheus.collectDefaultMetrics({register: prometheus.register});
+  const nodeMetricsLocation = await exportPrometheusMetrics(prometheus.register);
+  logging.debug(`Node metrics is at ${nodeMetricsLocation}`);
+
   const proxyHostname = process.env.SB_PUBLIC_IP;
   // Default to production metrics, as some old Docker images may not have
   // SB_METRICS_URL properly set.
@@ -66,8 +87,7 @@ function main() {
   }
 
   if (!proxyHostname) {
-    logging.error('Need to specify SB_PUBLIC_IP for invite links');
-    process.exit(1);
+    throw new Error('Need to specify SB_PUBLIC_IP for invite links');
   }
 
   logging.debug(`=== Config ===`);
@@ -78,17 +98,32 @@ function main() {
   const DEFAULT_PORT = 8081;
   const portNumber = Number(process.env.SB_API_PORT || DEFAULT_PORT);
   if (isNaN(portNumber)) {
-    logging.error(`Invalid SB_API_PORT: ${process.env.SB_API_PORT}`);
-    process.exit(1);
+    throw new Error(`Invalid SB_API_PORT: ${process.env.SB_API_PORT}`);
   }
+
+  const prometheusMetricsLocation = 'localhost:9090';
+  runPrometheusScraper(
+      [
+        '--storage.tsdb.retention', '31d', '--storage.tsdb.path',
+        getPersistentFilename('prometheus/data'), '--web.listen-address', prometheusMetricsLocation,
+        '--log.level', verbose ? 'debug' : 'info'
+      ],
+      getPersistentFilename('prometheus/config.yml'), {
+        global: {
+          scrape_interval: '15s',
+        },
+        scrape_configs: [
+          {job_name: 'prometheus', static_configs: [{targets: [prometheusMetricsLocation]}]},
+          {job_name: 'outline-server', static_configs: [{targets: [nodeMetricsLocation]}]}
+        ]
+      });
 
   const serverConfig =
       server_config.readServerConfig(getPersistentFilename('shadowbox_server_config.json'));
 
-  const shadowsocksServer = new LibevShadowsocksServer(proxyHostname, verbose);
-
   const metricsConfig = readMetricsConfig(getPersistentFilename('shadowbox_stats.json'));
   const managerMetrics = new ManagerMetrics(
+      new PrometheusClient(`http://${prometheusMetricsLocation}`),
       new json_config.ChildConfig(metricsConfig, metricsConfig.data().transferStats));
   const sharedMetrics = new SharedMetrics(
       new json_config.ChildConfig(metricsConfig, metricsConfig.data().hourlyMetrics), serverConfig,
@@ -97,8 +132,8 @@ function main() {
   logging.info('Starting...');
   const userConfigFilename = getPersistentFilename('shadowbox_config.json');
   createServerAccessKeyRepository(
-      proxyHostname, new FilesystemTextFile(userConfigFilename), shadowsocksServer, managerMetrics,
-      sharedMetrics)
+      proxyHostname, new FilesystemTextFile(userConfigFilename),
+      createShadowsocksMetrics(prometheus.register), verbose)
       .then((accessKeyRepository) => {
         const managerService = new ShadowsocksManagerService(
             process.env.SB_DEFAULT_SERVER_NAME || 'Outline Server', serverConfig,
@@ -138,4 +173,7 @@ process.on('unhandledRejection', (error) => {
   logging.error(`unhandledRejection: ${error}`);
 });
 
-main();
+main().catch((e) => {
+  logging.error(e);
+  process.exit(1);
+});

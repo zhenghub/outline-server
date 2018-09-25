@@ -14,7 +14,7 @@
 
 import {InMemoryConfig} from '../infrastructure/json_config';
 
-import {ManagerMetrics, ManagerMetricsJson} from './manager_metrics';
+import {ManagerMetrics, ManagerMetricsJson, parseEntry} from './manager_metrics';
 
 function addDays(baseDate: Date, days: number) {
   const date = new Date(baseDate);
@@ -23,26 +23,12 @@ function addDays(baseDate: Date, days: number) {
 }
 
 describe('ManagerMetrics', () => {
-  it('Saves traffic to config', (done) => {
-    const now = new Date();
-    const config = new InMemoryConfig({} as ManagerMetricsJson);
-    const metrics = new ManagerMetrics(config);
-
-    let report = metrics.get30DayByteTransfer();
-    expect(report.bytesTransferredByUserId).toEqual({});
-
-    for (let di = 0; di < 40; di++) {
-      metrics.recordBytesTransferred(addDays(now, -di), 'user-0', 1);
-    }
-    report = metrics.get30DayByteTransfer();
-    // This is being dropped
-    expect(report.bytesTransferredByUserId).toEqual({'user-0': 30});
-    // We are not cleaning this from the config.
-    expect(config.mostRecentWrite.userIdSet).toEqual(['user-0']);
-    expect(Object.keys(config.mostRecentWrite.dailyUserBytesTransferred).length).toEqual(40);
-
-    expect(new ManagerMetrics(new InMemoryConfig(config.mostRecentWrite)).get30DayByteTransfer())
-        .toEqual(report);
-    done();
+  describe('parseKey', () => {
+    it('Gets the access key and date', () => {
+      const parsed = parseEntry(['user-1-20170816', 123]);
+      expect(parsed.accessKey).toEqual('user-1');
+      expect(parsed.day).toEqual(new Date('2017-08-16'));
+      expect(parsed.bytes).toEqual(123);
+    });
   });
 });

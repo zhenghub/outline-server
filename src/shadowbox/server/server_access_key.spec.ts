@@ -141,6 +141,5 @@ function countAccessKeys(repo: AccessKeyRepository) {
 }
 
 function createRepo(inMemoryFile: InMemoryFile) {
-  return createServerAccessKeyRepository(
-      'hostname', inMemoryFile, new MockShadowsocksServer(), null, null);
+  return createServerAccessKeyRepository('hostname', inMemoryFile, null, true);
 }

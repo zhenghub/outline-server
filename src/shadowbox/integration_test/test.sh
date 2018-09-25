@@ -57,7 +57,7 @@ function ss_arguments_for_user() {
 
 # Runs curl on the client container.
 function client_curl() {
-  docker exec $CLIENT_CONTAINER curl "$@"
+  docker exec $CLIENT_CONTAINER curl --silent "$@"
 }
 
 # Start a subprocess for trap
@@ -112,6 +112,9 @@ function client_curl() {
   # Verify we can retrieve the target using the system nameservers.
   client_curl -x socks5h://localhost:$LOCAL_SOCKS_PORT http://target > $OUTPUT_DIR/actual.html
   diff $OUTPUT_DIR/actual.html target/index.html
+
+  # Verify the usage metrics.
+  docker exec $SHADOWBOX_CONTAINER curl 'localhost:9090/api/v1/query?query=shadowsocks_data_bytes' | grep -e '"value":\[.*,"1604"\]'
 
   # TODO(fortuna): Verify UDP requests.
 )

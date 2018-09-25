@@ -13,6 +13,7 @@
 // limitations under the License.
 
 import {JsonConfig} from '../infrastructure/json_config';
+import {PrometheusClient} from '../infrastructure/prometheus_scraper';
 import {AccessKeyId} from '../model/access_key';
 import {DataUsageByUser} from '../model/metrics';
 
@@ -30,64 +31,50 @@ export interface ManagerMetricsJson {
 // Surfaced by the manager service to display on the Manager UI.
 // TODO: Remove entries older than 30d.
 export class ManagerMetrics {
-  private dailyUserBytesTransferred: Map<string, number>;
-  private userIdSet: Set<AccessKeyId>;
+  constructor(
+      private prometheusClient: PrometheusClient,
+      private legacyConfig: JsonConfig<ManagerMetricsJson>) {}
 
-  constructor(private config: JsonConfig<ManagerMetricsJson>) {
-    const serializedObject = config.data();
-    if (serializedObject) {
-      this.dailyUserBytesTransferred = new Map(serializedObject.dailyUserBytesTransferred);
-      this.userIdSet = new Set(serializedObject.userIdSet);
-    } else {
-      this.dailyUserBytesTransferred = new Map();
-      this.userIdSet = new Set();
+  public async get30DayByteTransfer(): Promise<DataUsageByUser> {
+    // We currently only show the data that leaves the proxy, since that's what DigitalOcean
+    // measures.
+    const result = await this.prometheusClient.query(
+        'sum(increase(shadowsocks_data_bytes{dir=~"c<p|p>t|>p<"}[30d])) by (access_key)');
+    const usage = {} as {[userId: string]: number};
+    for (const entry of result.result) {
+      usage[entry.metric['access_key'] || ''] = parseFloat(entry.value[1]);
     }
+
+    // TODO: Remove this after 30 days of everyone being migrated, since we won't need the config
+    // file anymore.
+    this.addLegacyUsageData(usage);
+
+    return {bytesTransferredByUserId: usage};
   }
 
-  public recordBytesTransferred(date: Date, userId: AccessKeyId, numBytes: number) {
-    this.userIdSet.add(userId);
-
-    const oldTotal = this.getBytes(userId, date);
-    const newTotal = oldTotal + numBytes;
-    this.dailyUserBytesTransferred.set(this.getKey(userId, date), newTotal);
-    this.toJson(this.config.data());
-    this.config.write();
-  }
-
-  public get30DayByteTransfer(): DataUsageByUser {
-    const bytesTransferredByUserId = {};
-    for (let i = 0; i < 30; ++i) {
-      // Get Date from i days ago.
-      const d = new Date();
-      d.setDate(d.getDate() - i);
-
-      // Get transfer per userId and total
-      for (const userId of this.userIdSet) {
-        if (!bytesTransferredByUserId[userId]) {
-          bytesTransferredByUserId[userId] = 0;
-        }
-        const numBytes = this.getBytes(userId, d);
-        bytesTransferredByUserId[userId] += numBytes;
+  // Gets the legacy 30 day usage from the config file.
+  private addLegacyUsageData(usage: {[userId: string]: number}) {
+    if (!this.legacyConfig || !this.legacyConfig.data() ||
+        !this.legacyConfig.data().dailyUserBytesTransferred) {
+      return;
+    }
+    const startDate = new Date();
+    startDate.setDate(startDate.getDate() - 30);
+    for (const entry of this.legacyConfig.data().dailyUserBytesTransferred) {
+      const parsed = parseEntry(entry);
+      if (parsed.day < startDate) {
+        continue;
       }
+      usage[parsed.accessKey] += parsed.bytes;
     }
-    return {bytesTransferredByUserId};
   }
+}
 
-  // Returns the state of this object, e.g.
-  // {"dailyUserBytesTransferred":[["0-20170816",100],["1-20170816",100]],"userIdSet":["0","1"]}
-  private toJson(target: ManagerMetricsJson) {
-    // Use [...] operator to serialize Map and Set objects to JSON.
-    target.dailyUserBytesTransferred = [...this.dailyUserBytesTransferred];
-    target.userIdSet = [...this.userIdSet];
+export function parseEntry(entry: [string, number]): {accessKey: string, day: Date, bytes: number} {
+  const matches = entry[0].match(/(.+)-([0-9]{4})([0-9]{2})([0-9]{2})/);
+  if (matches.length !== 5) {
+    throw Error(`Found ${matches.length - 1} parts in key ${entry[0]}`);
   }
-
-  private getBytes(userId: AccessKeyId, d: Date) {
-    const key = this.getKey(userId, d);
-    return this.dailyUserBytesTransferred.get(key) || 0;
-  }
-
-  private getKey(userId: AccessKeyId, d: Date) {
-    const yyyymmdd = d.toISOString().substr(0, 'YYYY-MM-DD'.length).replace(/-/g, '');
-    return `${userId}-${yyyymmdd}`;
-  }
+  const day = new Date(`${matches[2]}-${matches[3]}-${matches[4]}`);
+  return {accessKey: matches[1], day, bytes: entry[1]};
 }

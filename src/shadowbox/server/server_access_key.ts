@@ -13,6 +13,7 @@
 // limitations under the License.
 
 import * as dgram from 'dgram';
+import * as prometheus from 'prom-client';
 import * as randomstring from 'randomstring';
 import * as uuidv4 from 'uuid/v4';
 
@@ -22,8 +23,7 @@ import {AccessKey, AccessKeyId, AccessKeyRepository} from '../model/access_key';
 import {ShadowsocksInstance, ShadowsocksServer} from '../model/shadowsocks_server';
 import {TextFile} from '../model/text_file';
 
-import {ManagerMetrics} from './manager_metrics';
-import {SharedMetrics} from './shared_metrics';
+import {LibevShadowsocksServer, ShadowsocksMetrics} from './libev_shadowsocks_server';
 
 // The format as json of access keys in the config file.
 interface AccessKeyConfig {
@@ -89,8 +89,8 @@ class AccessKeyConfigFile {
 }
 
 export function createServerAccessKeyRepository(
-    proxyHostname: string, textFile: TextFile, shadowsocksServer: ShadowsocksServer,
-    managerMetrics: ManagerMetrics, sharedMetrics: SharedMetrics): Promise<AccessKeyRepository> {
+    proxyHostname: string, textFile: TextFile, metrics: ShadowsocksMetrics,
+    verbose: boolean): Promise<AccessKeyRepository> {
   const configFile = new AccessKeyConfigFile(textFile);
   const configJson = configFile.loadConfig();
 
@@ -98,9 +98,9 @@ export function createServerAccessKeyRepository(
   // Create and save the metrics socket.
   return createBoundUdpSocket(reservedPorts).then((metricsSocket) => {
     reservedPorts.add(metricsSocket.address().port);
-    return new ServerAccessKeyRepository(
-        proxyHostname, configFile, configJson, shadowsocksServer, metricsSocket, managerMetrics,
-        sharedMetrics);
+    const shadowsocksServer =
+        new LibevShadowsocksServer(proxyHostname, metrics, metricsSocket, verbose);
+    return new ServerAccessKeyRepository(proxyHostname, configFile, configJson, shadowsocksServer);
   });
 }
 
@@ -128,9 +128,7 @@ class ServerAccessKeyRepository implements AccessKeyRepository {
 
   constructor(
       private proxyHostname: string, private configFile: AccessKeyConfigFile,
-      private configJson: ConfigJson, private shadowsocksServer: ShadowsocksServer,
-      private metricsSocket: dgram.Socket, private managerMetrics: ManagerMetrics,
-      private sharedMetrics: SharedMetrics) {
+      private configJson: ConfigJson, private shadowsocksServer: ShadowsocksServer) {
     for (const accessKeyJson of this.configJson.accessKeys) {
       this.startInstance(accessKeyJson).catch((error) => {
         logging.error(`Failed to start Shadowsocks instance for key ${accessKeyJson.id}: ${error}`);
@@ -203,21 +201,19 @@ class ServerAccessKeyRepository implements AccessKeyRepository {
   private startInstance(accessKeyJson: AccessKeyConfig): Promise<void> {
     return this.shadowsocksServer
         .startInstance(
-            accessKeyJson.port, accessKeyJson.password, this.metricsSocket,
+            accessKeyJson.id, accessKeyJson.port, accessKeyJson.password,
             accessKeyJson.encryptionMethod)
         .then((ssInstance) => {
-          ssInstance.onInboundBytes(
-              this.handleInboundBytes.bind(this, accessKeyJson.id, accessKeyJson.metricsId));
           this.ssInstances.set(accessKeyJson.id, ssInstance);
         });
   }
 
-  private handleInboundBytes(
-      accessKeyId: AccessKeyId, metricsId: AccessKeyId, inboundBytes: number,
-      ipAddresses: string[]) {
-    this.managerMetrics.recordBytesTransferred(new Date(), accessKeyId, inboundBytes);
-    this.sharedMetrics.recordBytesTransferred(metricsId, inboundBytes, ipAddresses);
-  }
+  // private handleInboundBytes(
+  //     accessKeyId: AccessKeyId, metricsId: AccessKeyId, inboundBytes: number,
+  //     ipAddresses: string[]) {
+  //   this.managerMetrics.recordBytesTransferred(new Date(), accessKeyId, inboundBytes);
+  //   this.sharedMetrics.recordBytesTransferred(metricsId, inboundBytes, ipAddresses);
+  // }
 
   private saveConfig() {
     this.configFile.saveConfig(this.configJson);

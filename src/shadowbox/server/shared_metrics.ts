@@ -85,21 +85,6 @@ export class SharedMetrics {
     setHourlyInterval(this.generateHourlyReport.bind(this));
   }
 
-  // CONSIDER: accepting hashedIpAddresses, which can be persisted to disk
-  // and reported to the metrics server (to approximate number of devices per userId).
-  recordBytesTransferred(userId: AccessKeyId, numBytes: number, ipAddresses: string[]) {
-    const perUserMetrics = this.lastHourUserMetrics.get(userId) ||
-        {bytesTransferred: 0, anonymizedIpAddresses: new Set<string>()};
-    perUserMetrics.bytesTransferred += numBytes;
-    const anonymizedIpAddresses = getAnonymizedAndDedupedIpAddresses(ipAddresses);
-    for (const ip of anonymizedIpAddresses) {
-      perUserMetrics.anonymizedIpAddresses.add(ip);
-    }
-    this.lastHourUserMetrics.set(userId, perUserMetrics);
-    this.toJson(this.config.data());
-    this.config.write();
-  }
-
   reset(): void {
     this.lastHourUserMetrics = new Map<AccessKeyId, PerUserMetrics>();
     this.startDatetime = new Date();
@@ -135,6 +120,7 @@ export class SharedMetrics {
   }
 
   private generateHourlyReport(): void {
+    // TODO: lookup Prometheus
     if (this.lastHourUserMetrics.size === 0) {
       // No connection metrics to report.
       return;
