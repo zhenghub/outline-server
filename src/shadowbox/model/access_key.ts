@@ -27,6 +27,14 @@ export interface ProxyParams {
   password: string;
 }
 
+// Parameters needed to enforce an access key data quota, over a sliding window.
+export interface AccessKeyQuota {
+  // The allowed metered traffic measured in bytes.
+  quotaBytes: number;
+  // The sliding window size in hours.
+  windowSizeHours: number;
+}
+
 // AccessKey is what admins work with. It gives ProxyParams a name and identity.
 export interface AccessKey {
   // The unique identifier for this access key.
@@ -37,6 +45,10 @@ export interface AccessKey {
   metricsId: AccessKeyMetricsId;
   // Parameters to access the proxy
   proxyParams: ProxyParams;
+  // Admin-controlled, data transfer quota for this access key. Unlimited if unset.
+  quota?: AccessKeyQuota;
+  // Whether the access key data usage exceeds the quota.
+  isOverQuota?: boolean;
 }
 
 export interface AccessKeyRepository {
@@ -49,7 +61,11 @@ export interface AccessKeyRepository {
   // Apply the specified update to the specified access key.
   // Returns true if successful.
   renameAccessKey(id: AccessKeyId, name: string): boolean;
-
   // Gets the metrics id for a given Access Key.
   getMetricsId(id: AccessKeyId): AccessKeyMetricsId|undefined;
+  // Sets the transfer quota for the specified access key. Passing an undefined `quota`
+  // lifts the quota restriction. Returns true if successful.
+  setAccessKeyQuota(id: AccessKeyId, quota: AccessKeyQuota|undefined): boolean;
+  // Marks the specified access key as exceeding the data quota. Returns true if successful.
+  setAccessKeyOverQuota(id: AccessKeyId, isOverQuota: boolean): boolean;
 }

@@ -63,7 +63,7 @@ describe('ServerAccessKeyRepository', () => {
       const NEW_NAME = 'newName';
       const renameResult = repo.renameAccessKey(accessKey.id, NEW_NAME);
       expect(renameResult).toEqual(true);
-      // List keys again and expect to see the NEW_NAME;
+      // List keys again and expect to see the NEW_NAME.
       const accessKeys = iterToArray(repo.listAccessKeys());
       expect(accessKeys[0].name).toEqual(NEW_NAME);
       done();
@@ -76,9 +76,101 @@ describe('ServerAccessKeyRepository', () => {
       const NEW_NAME = 'newName';
       const renameResult = repo.renameAccessKey('badId', NEW_NAME);
       expect(renameResult).toEqual(false);
-      // List keys again and expect to NOT see the NEW_NAME;
+      // List keys again and expect to NOT see the NEW_NAME.
       const accessKeys = iterToArray(repo.listAccessKeys());
       expect(accessKeys[0].name).not.toEqual(NEW_NAME);
+      done();
+    });
+  });
+
+  it('Creates access keys with no transfer quota', (done) => {
+    const repo = createRepo();
+    repo.createNewAccessKey().then((accessKey) => {
+      expect(accessKey.quota).toBeUndefined();
+      expect(accessKey.isOverQuota).toBeFalsy();
+      done();
+    });
+  });
+
+  it('Can set access key transfer quota', (done) => {
+    const repo = createRepo();
+    repo.createNewAccessKey().then((accessKey) => {
+      const quota = {quotaBytes: 5000, windowSizeHours: 24};
+      const setQuotaResult = repo.setAccessKeyQuota(accessKey.id, quota);
+      expect(setQuotaResult).toBeTruthy();
+      // List keys again and expect to see the transfer quota.
+      const accessKeys = iterToArray(repo.listAccessKeys());
+      expect(accessKeys[0].quota).toEqual(quota);
+      done();
+    });
+  });
+
+  it('Can clear access key transfer quota', (done) => {
+    const repo = createRepo();
+    repo.createNewAccessKey().then((accessKey) => {
+      const quota = {quotaBytes: 5000, windowSizeHours: 24};
+      const setQuotaResult = repo.setAccessKeyQuota(accessKey.id, quota);
+      expect(setQuotaResult).toEqual(true);
+      // List keys again and expect to see the transfer quota.
+      let accessKeys = iterToArray(repo.listAccessKeys());
+      expect(accessKeys[0].quota).toEqual(quota);
+
+      const clearQuotaResult = repo.setAccessKeyQuota(accessKey.id, undefined);
+      expect(clearQuotaResult).toBeTruthy();
+      accessKeys = iterToArray(repo.listAccessKeys());
+      expect(accessKeys[0].quota).toBeUndefined();
+      done();
+    });
+  });
+
+  it('setAccessKeyQuota returns false for missing keys', (done) => {
+    const repo = createRepo();
+    repo.createNewAccessKey().then((accessKey) => {
+      const quota = {quotaBytes: 1000, windowSizeHours: 24};
+      const setQuotaResult = repo.setAccessKeyQuota('doesnotexist', quota);
+      expect(setQuotaResult).toBeFalsy();
+      done();
+    });
+  });
+
+  it('setAccessKeyQuota fails with negative quotas', (done) => {
+    const repo = createRepo();
+    repo.createNewAccessKey().then((accessKey) => {
+      let quota = {quotaBytes: -1000, windowSizeHours: 24};
+      let setQuotaResult = repo.setAccessKeyQuota(accessKey.id, quota);
+      expect(setQuotaResult).toBeFalsy();
+      quota = {quotaBytes: 1000, windowSizeHours: -24};
+      setQuotaResult = repo.setAccessKeyQuota(accessKey.id, quota);
+      expect(setQuotaResult).toBeFalsy();
+      done();
+    });
+  });
+
+  it('Can creates access keys under quota', (done) => {
+    const repo = createRepo();
+    repo.createNewAccessKey().then((accessKey) => {
+      expect(accessKey.isOverQuota).toBeFalsy();
+      done();
+    });
+  });
+
+  it('Can set access key over quota', (done) => {
+    const repo = createRepo();
+    repo.createNewAccessKey().then((accessKey) => {
+      const setQuotaResult = repo.setAccessKeyOverQuota(accessKey.id, true);
+      expect(setQuotaResult).toBeTruthy();
+
+      const accessKeys = iterToArray(repo.listAccessKeys());
+      expect(accessKeys[0].isOverQuota).toBeTruthy();
+      done();
+    });
+  });
+
+  it('setAccessKeyOverQuota returns false for missing keys', (done) => {
+    const repo = createRepo();
+    repo.createNewAccessKey().then((accessKey) => {
+      const setQuotaResult = repo.setAccessKeyOverQuota('doesnotexist', true);
+      expect(setQuotaResult).toBeFalsy();
       done();
     });
   });

@@ -17,8 +17,9 @@ import * as uuidv4 from 'uuid/v4';
 
 import {PortProvider} from '../infrastructure/get_port';
 import {JsonConfig} from '../infrastructure/json_config';
-import {AccessKey, AccessKeyId, AccessKeyMetricsId, AccessKeyRepository} from '../model/access_key';
+import {AccessKey, AccessKeyId, AccessKeyMetricsId, AccessKeyQuota, AccessKeyRepository} from '../model/access_key';
 import {ShadowsocksServer} from '../model/shadowsocks_server';
+
 import {ServerConfigJson} from './server_config';
 
 // The format as json of access keys in the config file.
@@ -29,6 +30,8 @@ interface AccessKeyConfig {
   password: string;
   port: number;
   encryptionMethod?: string;
+  quota?: AccessKeyQuota;
+  isOverQuota?: boolean;
 }
 
 // The configuration file format as json.
@@ -56,7 +59,9 @@ function makeAccessKey(hostname: string, accessKeyJson: AccessKeyConfig): Access
       portNumber: accessKeyJson.port,
       encryptionMethod: accessKeyJson.encryptionMethod,
       password: accessKeyJson.password,
-    }
+    },
+    quota: accessKeyJson.quota,
+    isOverQuota: accessKeyJson.isOverQuota
   };
 }
 
@@ -134,6 +139,37 @@ export class ServerAccessKeyRepository implements AccessKeyRepository {
       return false;
     }
     accessKeyJson.name = name;
+    try {
+      this.keyConfig.write();
+    } catch (error) {
+      return false;
+    }
+    return true;
+  }
+
+  setAccessKeyQuota(id: AccessKeyId, quota: AccessKeyQuota|undefined): boolean {
+    if (!!quota && (quota.quotaBytes < 0 || quota.windowSizeHours < 0)) {
+      return false;
+    }
+    const accessKeyJson = this.getAccessKey(id);
+    if (!accessKeyJson) {
+      return false;
+    }
+    accessKeyJson.quota = quota;
+    try {
+      this.keyConfig.write();
+    } catch (error) {
+      return false;
+    }
+    return true;
+  }
+
+  setAccessKeyOverQuota(id: AccessKeyId, isOverQuota: boolean): boolean {
+    const accessKeyJson = this.getAccessKey(id);
+    if (!accessKeyJson) {
+      return false;
+    }
+    accessKeyJson.isOverQuota = isOverQuota;
     try {
       this.keyConfig.write();
     } catch (error) {

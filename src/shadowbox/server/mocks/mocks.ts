@@ -13,7 +13,7 @@
 // limitations under the License.
 
 
-import {AccessKey, AccessKeyId, AccessKeyRepository} from '../../model/access_key';
+import {AccessKey, AccessKeyId, AccessKeyQuota, AccessKeyRepository} from '../../model/access_key';
 import {TextFile} from '../../model/text_file';
 
 export class MockAccessKeyRepository implements AccessKeyRepository {
@@ -57,6 +57,24 @@ export class MockAccessKeyRepository implements AccessKeyRepository {
   }
   getMetricsId(accessKeyId: AccessKeyId) {
     return `metrics:${accessKeyId}`;
+  }
+  setAccessKeyQuota(id: AccessKeyId, quota: AccessKeyQuota|undefined): boolean {
+    for (let i = 0; i < this.accessKeys.length; ++i) {
+      if (this.accessKeys[i].id === id) {
+        this.accessKeys[i].quota = quota;
+        return true;
+      }
+    }
+    return false;
+  }
+  setAccessKeyOverQuota(id: AccessKeyId, isOverQuota: boolean): boolean {
+    for (let i = 0; i < this.accessKeys.length; ++i) {
+      if (this.accessKeys[i].id === id) {
+        this.accessKeys[i].isOverQuota = isOverQuota;
+        return true;
+      }
+    }
+    return false;
   }
 }
 
