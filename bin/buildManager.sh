@@ -1,0 +1,1 @@
+yarn do server_manager/electron_app/build
